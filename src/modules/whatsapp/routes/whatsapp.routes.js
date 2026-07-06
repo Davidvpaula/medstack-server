@@ -13,9 +13,18 @@ import {
     messages,
     send,
     sendPipeline,
+    dispatchText,
+    dispatchQueue,
+    retryDispatchJob,
+    clearDispatchQueue,
+    clearLogs,
     bindCompany,
     showCompanyBinding
 } from "../controllers/whatsapp.controller.js";
+
+import {
+    runtimeDashboard
+} from "../controllers/whatsapp-runtime-dashboard.controller.js";
 
 import {
     simulateIncoming,
@@ -30,6 +39,7 @@ const router = Router();
 
 router.get("/status", status);
 router.get("/runtime", runtime);
+router.get("/dashboard", runtimeDashboard);
 router.get("/health", health);
 
 router.get("/start", start);
@@ -51,6 +61,13 @@ router.get("/messages", messages);
 
 router.post("/send", send);
 router.post("/send-pipeline", sendPipeline);
+
+router.post("/dispatch", dispatchText);
+router.get("/dispatch", dispatchQueue);
+router.post("/dispatch/:jobId/retry", retryDispatchJob);
+router.post("/dispatch/clear", clearDispatchQueue);
+
+router.post("/logs/clear", clearLogs);
 
 router.get("/instance/:instanceId/company", showCompanyBinding);
 router.post("/instance/:instanceId/company", bindCompany);

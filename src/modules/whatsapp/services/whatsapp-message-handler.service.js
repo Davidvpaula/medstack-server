@@ -10,7 +10,12 @@ import {
     MESSAGE_TYPE
 } from "../../message/constants/message.constants.js";
 
+import {
+    getStatsState
+} from "./whatsapp-runtime-state.service.js";
+
 export async function handleIncomingWhatsAppMessage(data = {}) {
+
     const {
         companyId,
         phone,
@@ -29,62 +34,110 @@ export async function handleIncomingWhatsAppMessage(data = {}) {
         throw new Error("Informe phone.");
     }
 
-    const phoneNormalized = normalizePhone(phone);
+    const phoneNormalized =
+        normalizePhone(phone);
 
-    let contact = contactRepository.findByPhone(
-        companyId,
-        phoneNormalized
-    );
+    let contact =
+        contactRepository.findByPhone(
+            companyId,
+            phoneNormalized
+        );
 
     if (!contact) {
-        contact = await createContact({
-            companyId,
-            name: name || phone,
-            phone,
-            source: provider,
-            channel: "whatsapp",
-            metadata: {
-                provider,
-                ...metadata
-            }
-        });
+
+        contact =
+            await createContact({
+
+                companyId,
+
+                name: name || phone,
+
+                phone,
+
+                source: provider,
+
+                channel: "whatsapp",
+
+                metadata: {
+
+                    provider,
+
+                    ...metadata
+
+                }
+
+            });
+
     }
 
-    const conversation = await createConversation({
-        companyId,
-        contactId: contact.id,
-        channel: "whatsapp",
-        title: contact.name,
-        metadata: {
-            provider
-        }
-    });
+    const conversation =
+        await createConversation({
 
-    const message = await createMessage({
-        companyId,
-        conversationId: conversation.id,
-        contactId: contact.id,
-        direction: MESSAGE_DIRECTION.INBOUND,
-        senderType: MESSAGE_SENDER_TYPE.CONTACT,
-        senderId: contact.id,
-        type: MESSAGE_TYPE.TEXT,
-        text: text || "",
-        externalId: externalId || null,
-        metadata: {
-            provider,
-            phone,
-            ...metadata
-        }
-    });
+            companyId,
+
+            contactId: contact.id,
+
+            channel: "whatsapp",
+
+            title: contact.name,
+
+            metadata: {
+
+                provider
+
+            }
+
+        });
+
+    const message =
+        await createMessage({
+
+            companyId,
+
+            conversationId: conversation.id,
+
+            contactId: contact.id,
+
+            direction: MESSAGE_DIRECTION.INBOUND,
+
+            senderType: MESSAGE_SENDER_TYPE.CONTACT,
+
+            senderId: contact.id,
+
+            type: MESSAGE_TYPE.TEXT,
+
+            text: text || "",
+
+            externalId: externalId || null,
+
+            metadata: {
+
+                provider,
+
+                phone,
+
+                ...metadata
+
+            }
+
+        });
+
+    getStatsState().inbound++;
 
     return {
+
         contact,
+
         conversation,
+
         message
+
     };
+
 }
 
 export async function handleOutgoingWhatsAppMessage(data = {}) {
+
     const {
         companyId,
         conversationId,
@@ -107,26 +160,51 @@ export async function handleOutgoingWhatsAppMessage(data = {}) {
         throw new Error("Informe contactId.");
     }
 
-    const message = await createMessage({
-        companyId,
-        conversationId,
-        contactId,
-        direction: MESSAGE_DIRECTION.OUTBOUND,
-        senderType: userId ? MESSAGE_SENDER_TYPE.USER : MESSAGE_SENDER_TYPE.SYSTEM,
-        senderId: userId,
-        type: MESSAGE_TYPE.TEXT,
-        text: text || "",
-        metadata: {
-            provider,
-            ...metadata
-        }
-    });
+    const message =
+        await createMessage({
+
+            companyId,
+
+            conversationId,
+
+            contactId,
+
+            direction: MESSAGE_DIRECTION.OUTBOUND,
+
+            senderType:
+                userId
+                    ? MESSAGE_SENDER_TYPE.USER
+                    : MESSAGE_SENDER_TYPE.SYSTEM,
+
+            senderId: userId,
+
+            type: MESSAGE_TYPE.TEXT,
+
+            text: text || "",
+
+            metadata: {
+
+                provider,
+
+                ...metadata
+
+            }
+
+        });
+
+    getStatsState().outbound++;
 
     return {
+
         message
+
     };
+
 }
 
 function normalizePhone(phone) {
-    return String(phone || "").replace(/\D/g, "");
+
+    return String(phone || "")
+        .replace(/\D/g, "");
+
 }

@@ -17,17 +17,32 @@ import {
     getWhatsappHealthMonitorState
 } from "./whatsapp-health-monitor.service.js";
 
-export function getWhatsappRuntime(instanceId = WHATSAPP_DEFAULT_INSTANCE_ID) {
-    const status = whatsappRepository.getStatusSnapshot(instanceId);
-    const qr = whatsappRepository.getQrSnapshot(instanceId);
-    const health = whatsappConnectionManager.getHealth(instanceId);
+import {
+    getRuntimeState
+} from "./whatsapp-runtime-state.service.js";
+
+export function getWhatsappRuntime(
+    instanceId = WHATSAPP_DEFAULT_INSTANCE_ID
+) {
+
+    const status =
+        whatsappRepository.getStatusSnapshot(instanceId);
+
+    const qr =
+        whatsappRepository.getQrSnapshot(instanceId);
+
+    const health =
+        whatsappConnectionManager.getHealth(instanceId);
 
     return {
+
         instanceId,
 
-        companyBinding: getInstanceCompanyBinding(instanceId),
+        companyBinding:
+            getInstanceCompanyBinding(instanceId),
 
-        bindings: listInstanceCompanyBindings(),
+        bindings:
+            listInstanceCompanyBindings(),
 
         status,
 
@@ -38,17 +53,30 @@ export function getWhatsappRuntime(instanceId = WHATSAPP_DEFAULT_INSTANCE_ID) {
         },
 
         socket: {
-            hasSocket: whatsappSocketLifecycle.hasSocket(instanceId),
-            alive: whatsappSocketLifecycle.isSocketAlive(instanceId)
+            hasSocket:
+                whatsappSocketLifecycle.hasSocket(instanceId),
+
+            alive:
+                whatsappSocketLifecycle.isSocketAlive(instanceId)
         },
 
         health,
 
-        monitor: getWhatsappHealthMonitorState(instanceId),
+        monitor:
+            getWhatsappHealthMonitorState(instanceId),
 
-        providers: listWhatsAppProviders(),
+        // NOVO
+        ...getRuntimeState(),
 
-        createdAt: status.createdAt || null,
-        updatedAt: status.updatedAt || null
+        providers:
+            listWhatsAppProviders(),
+
+        createdAt:
+            status.createdAt || null,
+
+        updatedAt:
+            status.updatedAt || null
+
     };
+
 }

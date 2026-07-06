@@ -27,6 +27,17 @@ import {
     getInstanceCompanyBinding
 } from "../services/instance-company-resolver.service.js";
 
+import {
+    dispatchWhatsAppText,
+    listWhatsAppDispatchQueue,
+    retryWhatsAppDispatchJob,
+    clearWhatsAppDispatchQueue
+} from "../services/whatsapp-dispatcher.service.js";
+
+import {
+    clearRuntimeLogs
+} from "../services/whatsapp-runtime-log.service.js";
+
 export function status(req, res) {
     return response.success(
         res,
@@ -97,71 +108,24 @@ export function qrPage(req, res) {
             <meta charset="UTF-8" />
             <meta http-equiv="refresh" content="3" />
             <title>MedStack WhatsApp QR</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    background: #f3f4f6;
-                    padding: 40px;
-                }
-
-                .card {
-                    max-width: 520px;
-                    background: white;
-                    padding: 30px;
-                    border-radius: 14px;
-                    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-                }
-
-                img {
-                    width: 320px;
-                    max-width: 100%;
-                    margin-top: 20px;
-                }
-
-                .status {
-                    font-size: 18px;
-                    margin-top: 10px;
-                }
-
-                a {
-                    display: inline-block;
-                    margin-top: 18px;
-                    color: #2563eb;
-                }
-            </style>
         </head>
         <body>
-            <div class="card">
-                <h1>Conectar WhatsApp</h1>
+            <h1>Conectar WhatsApp</h1>
+            <p>Status: <strong>${data.status}</strong></p>
 
-                <p class="status">
-                    Status: <strong>${data.status}</strong>
-                </p>
+            ${
+                data.connected
+                    ? "<h2>✅ WhatsApp conectado</h2>"
+                    : data.qr
+                        ? `<img src="${data.qr}" alt="QR Code WhatsApp" style="width:320px;max-width:100%;" />`
+                        : "<p>QR ainda não gerado. Acesse /whatsapp/start-runtime primeiro.</p>"
+            }
 
-                ${
-                    data.connected
-                        ? "<h2>✅ WhatsApp conectado</h2>"
-                        : data.qr
-                            ? `<img src="${data.qr}" alt="QR Code WhatsApp" />`
-                            : "<p>QR ainda não gerado. Acesse /whatsapp/start-runtime primeiro.</p>"
-                }
-
-                <br />
-
-                <a href="/whatsapp/start-runtime">Iniciar runtime</a>
-                <br />
-                <a href="/whatsapp/start">Iniciar conexão legado</a>
-                <br />
-                <a href="/whatsapp/restart-runtime">Reiniciar runtime</a>
-                <br />
-                <a href="/whatsapp/restart">Reiniciar legado</a>
-                <br />
-                <a href="/whatsapp/status">Ver status JSON</a>
-                <br />
-                <a href="/whatsapp/health">Ver health JSON</a>
-                <br />
-                <a href="/whatsapp/runtime">Ver runtime JSON</a>
-            </div>
+            <br />
+            <a href="/whatsapp/start-runtime">Iniciar runtime</a><br />
+            <a href="/whatsapp/restart-runtime">Reiniciar runtime</a><br />
+            <a href="/whatsapp/runtime">Ver runtime JSON</a><br />
+            <a href="/whatsapp/dashboard">Ver dashboard</a>
         </body>
         </html>
     `;
@@ -231,6 +195,58 @@ export async function sendPipeline(req, res, next) {
     } catch (error) {
         next(error);
     }
+}
+
+export function dispatchText(req, res, next) {
+    try {
+        const job = dispatchWhatsAppText(req.body);
+
+        return response.success(
+            res,
+            "Mensagem adicionada à fila de envio.",
+            job
+        );
+    } catch (error) {
+        next(error);
+    }
+}
+
+export function dispatchQueue(req, res) {
+    return response.success(
+        res,
+        "Fila de envio WhatsApp carregada.",
+        listWhatsAppDispatchQueue()
+    );
+}
+
+export function retryDispatchJob(req, res, next) {
+    try {
+        const job = retryWhatsAppDispatchJob(req.params.jobId);
+
+        return response.success(
+            res,
+            "Job reenfileirado para nova tentativa.",
+            job
+        );
+    } catch (error) {
+        next(error);
+    }
+}
+
+export function clearDispatchQueue(req, res) {
+    return response.success(
+        res,
+        "Fila WhatsApp limpa.",
+        clearWhatsAppDispatchQueue()
+    );
+}
+
+export function clearLogs(req, res) {
+    return response.success(
+        res,
+        "Logs do runtime limpos.",
+        clearRuntimeLogs()
+    );
 }
 
 export function bindCompany(req, res, next) {
