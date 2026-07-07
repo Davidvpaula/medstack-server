@@ -1,129 +1,164 @@
-# Módulo WhatsApp
+# MÓDULO WHATSAPP
 
-## Objetivo
-
-Controlar comunicação WhatsApp.
-
----
-
-## Estrutura
-
-Routes
-
-↓
-
-Controller
-
-↓
-
-Services
-
-↓
-
-Repositories
-
-↓
-
-Store
+Versão:
+1.0
 
 ---
 
-## Comunicação com Baileys
+# Objetivo
+
+O módulo WhatsApp é responsável pela comunicação entre o MedStack e o WhatsApp.
+
+Ele é apenas um módulo do SaaS.
+
+Nunca deve conter regras de CRM, usuários ou faturamento.
+
+---
+
+# Estrutura
+
+```txt
+src/modules/whatsapp/
+
+controllers/
+
+services/
+
+routes/
+
+providers/
+
+repositories/
+
+workers/
+
+queues/
+
+constants/
+```
+
+---
+
+# Runtime
+
+Cada empresa possui:
+
+1 Runtime
+
+1 Socket
+
+1 QR
+
+1 Queue
+
+1 Worker
+
+1 Dispatcher
+
+1 Health Monitor
+
+1 Runtime State
+
+1 Runtime Logs
+
+Nunca compartilhar Runtime.
+
+---
+
+# Providers
+
+Hoje:
 
 Baileys
 
-↓
+Futuro:
 
-Socket
+Meta Cloud API
 
-↓
+Twilio
 
-Events
+Evolution
 
-↓
+Outros
 
-Services
-
-↓
-
-Repositories
-
-↓
-
-Store
+Sempre utilizar Provider Pattern.
 
 ---
 
-## Services
+# Worker
 
-connection.service
+Responsável por:
 
-message.service
+Receber mensagens.
 
-qr.service
+Enviar mensagens.
 
-session.service
+Processar fila.
 
-connection-manager.service
+Retry.
 
-socket-lifecycle.service
-
-instance-manager.service
-
-health.service (futuro)
-
-heartbeat.service (futuro)
-
-metrics.service (futuro)
+Dead Letter.
 
 ---
 
-## Repository
+# Dispatcher
 
-whatsapp.repository.js
+Toda mensagem passa pelo Dispatcher.
 
-Responsável por acesso aos dados.
-
----
-
-## Store
-
-whatsapp.store.js
-
-Estado temporário.
+Nunca enviar diretamente pelo socket.
 
 ---
 
-## Events
+# Queue
 
-connection-update.event.js
+Hoje:
 
-messages-upsert.event.js
+Memória.
+
+Futuro:
+
+BullMQ.
+
+Redis.
+
+Interface pública deve permanecer igual.
 
 ---
 
-## Socket
+# QR Code
 
-whatsapp.socket.js
+Cada empresa possui um QR independente.
 
-Responsável apenas pela integração Baileys.
+Nunca compartilhar sessões.
 
 ---
 
-## Próximos componentes
+# Sessão
 
-Health Monitor
+Cada empresa terá sua própria sessão autenticada.
 
-Heartbeat
+Sessões nunca podem ser reutilizadas entre empresas.
 
-Metrics
+---
 
-Session Manager
+# Objetivo futuro
 
-Reconnect Inteligente
+Suportar:
 
-Workers
+100+
 
-Redis
+500+
 
-BullMQ
+1000+
+
+empresas simultaneamente.
+
+---
+
+# IA
+
+A IA nunca envia mensagens diretamente.
+
+Ela apenas gera decisões.
+
+O envio continua sendo responsabilidade do Runtime.

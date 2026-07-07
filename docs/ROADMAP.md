@@ -1,238 +1,125 @@
-# Roadmap Oficial — MedStack Server
+# ROADMAP
 
-Última atualização: Arquitetura 0.3
+## Fase 1
 
----
+Backend Base
 
-# VISÃO
+Status:
 
-Construir um Framework SaaS de Comunicação preparado para:
-
-- Múltiplas Empresas
-- Múltiplos Usuários
-- Múltiplos WhatsApps
-- Omnichannel
-- CRM
-- IA
-- Fluxos
-- API Pública
-- Marketplace
+Concluído
 
 ---
 
-# FASE 1 — CORE
+## Fase 2
 
-## Infraestrutura
+WhatsApp Runtime
 
-- [x] Express
-- [x] Logger
-- [x] Response
-- [x] Error Handler
-- [x] AppError
-- [x] Config
-- [x] Constants
+Status:
+
+Concluído
 
 ---
 
-## WhatsApp
+## Fase 3
 
-- [x] Baileys
-- [x] QR Code
-- [x] Sessão
-- [x] Reconexão básica
-- [x] Repository
-- [x] Events
-- [x] Services
-- [x] Store
-- [x] Connection Manager
-- [x] Socket Lifecycle
-- [x] Instance Manager
+Dispatcher
+
+Worker
+
+Queue
+
+Status:
+
+Concluído
 
 ---
 
-## Documentação
+## Fase 4
 
-- [x] Arquitetura
-- [x] Padrão Desenvolvimento
-- [x] Core Principles
-- [x] Módulo WhatsApp
-- [x] Decisões Arquitetura
+Runtime Dashboard
 
----
+Status:
 
-# FASE 2 — OBSERVABILIDADE
-
-## Health
-
-- [ ] Health Service
-- [ ] Health Endpoint
-- [ ] Health Dashboard
+Concluído
 
 ---
 
-## Heartbeat
+## Fase 5
 
-- [ ] Heartbeat Worker
-- [ ] Heartbeat Timer
-- [ ] Heartbeat Status
+AI Monitor
 
----
+Status:
 
-## Metrics
-
-- [ ] CPU
-- [ ] RAM
-- [ ] Uptime
-- [ ] Socket Status
-- [ ] Última Mensagem
-- [ ] Última Reconexão
-- [ ] Latência
+Concluído
 
 ---
 
-## Session
+## Fase 6
 
-- [ ] Session Monitor
-- [ ] Session Recovery
-- [ ] Session Cleanup
+PostgreSQL
 
----
+Status:
 
-## Logs
-
-- [ ] Estruturados
-- [ ] Rotação
-- [ ] Persistência
+Em desenvolvimento
 
 ---
 
-# FASE 3 — WHATSAPP
+## Fase 7
 
-Mensagens
+Redis
 
-- [ ] Texto
-- [ ] Imagem
-- [ ] Documento
-- [ ] Áudio
-- [ ] Vídeo
-- [ ] Sticker
-- [ ] Localização
-- [ ] Contato
+BullMQ
 
-Eventos
-
-- [ ] Read
-- [ ] Delivered
-- [ ] Presence
-- [ ] Typing
-- [ ] Reações
+Workers separados
 
 ---
 
-# FASE 4 — CRM
+## Fase 8
 
-- [ ] Contatos
-- [ ] Conversas
-- [ ] Etiquetas
-- [ ] Notas
-- [ ] Histórico
-- [ ] Funil
-- [ ] Atendimento
+JWT
+
+RBAC
 
 ---
 
-# FASE 5 — FLOW ENGINE
+## Fase 9
 
-- [ ] Nó Mensagem
-- [ ] Nó Imagem
-- [ ] Nó Áudio
-- [ ] Nó Delay
-- [ ] Nó Condição
-- [ ] Nó HTTP
-- [ ] Nó IA
-- [ ] Nó Variável
-- [ ] Nó Webhook
-- [ ] Nó Transferência
-- [ ] Nó Loop
+Docker
 
 ---
 
-# FASE 6 — IA
+## Fase 10
 
-- [ ] OpenAI
-- [ ] Gemini
-- [ ] Claude
-
-Memória
-
-- [ ] Curta
-- [ ] Longa
-
-Custos
-
-- [ ] Tokens
-- [ ] Consumo
-- [ ] Limites
+VPS
 
 ---
 
-# FASE 7 — MULTIEMPRESA
+## Fase 11
 
-- [ ] Empresas
-- [ ] Usuários
-- [ ] Permissões
-- [ ] Instâncias
-- [ ] Múltiplos WhatsApps
+Frontend Lovable
 
 ---
 
-# FASE 8 — OMNICHANNEL
+## Fase 12
 
-- [ ] Instagram
-- [ ] Messenger
-- [ ] Telegram
-- [ ] Email
-- [ ] Webchat
-- [ ] Telefonia
-- [ ] Videochamada
+Produção
 
 ---
 
-# FASE 9 — INFRAESTRUTURA
+## Fase 13
 
-- [ ] Redis
-- [ ] BullMQ
-- [ ] Docker
-- [ ] Nginx
-- [ ] SSL
-- [ ] PM2
+IA Inteligente
 
----
+Aprender código
 
-# FASE 10 — DASHBOARD
+Analisar arquitetura
 
-- [ ] Dashboard Admin
-- [ ] Dashboard Empresa
-- [ ] Dashboard Usuário
-- [ ] Dashboard Financeiro
-- [ ] Dashboard IA
+Analisar banco
 
----
+Analisar Docker
 
-# FASE 11 — API
+Analisar Performance
 
-- [ ] API Pública
-- [ ] API Keys
-- [ ] OAuth
-- [ ] Rate Limit
-- [ ] Webhooks
+Analisar Segurança
 
----
-
-# FASE 12 — MARKETPLACE
-
-- [ ] Plugins
-- [ ] IA
-- [ ] Integrações
-- [ ] Templates
-- [ ] Fluxos
+Gerar sugestões reais

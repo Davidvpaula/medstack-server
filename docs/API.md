@@ -1,136 +1,293 @@
-# API Oficial — MedStack Server
+# MEDSTACK SERVER
 
-## Base URL
+# API
 
-```
-http://localhost:3000
+Versão:
+1.0
+
+Este documento descreve toda a arquitetura REST do MedStack Server.
+
+---
+
+# Objetivo
+
+Toda comunicação entre:
+
+Frontend
+
+↓
+
+Backend
+
+↓
+
+Banco
+
+↓
+
+WhatsApp
+
+ocorre através desta API.
+
+O Frontend Lovable nunca acessa diretamente:
+
+Banco
+
+Runtime
+
+Socket
+
+Dispatcher
+
+Workers
+
+Tudo ocorre via REST API.
+
+---
+
+# Estrutura
+
+```txt
+Frontend
+
+↓
+
+HTTP REST
+
+↓
+
+Express
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+Provider
+
+↓
+
+Database / Runtime
 ```
 
 ---
 
-# Sistema
+# Padrão de resposta
 
-## Health
-
-GET
-
-```
-/health
-```
-
-Retorna status do servidor.
-
----
-
-# WhatsApp
-
-## Status
-
-GET
-
-```
-/whatsapp/status
-```
-
----
-
-## Iniciar
-
-GET
-
-POST
-
-```
-/whatsapp/start
-```
-
----
-
-## Reiniciar
-
-GET
-
-POST
-
-```
-/whatsapp/restart
-```
-
----
-
-## QR
-
-GET
-
-```
-/whatsapp/qr
-```
-
----
-
-## Página QR
-
-GET
-
-```
-/whatsapp/qr-page
-```
-
----
-
-## Mensagens
-
-GET
-
-```
-/whatsapp/messages
-```
-
----
-
-## Enviar mensagem
-
-POST
-
-```
-/whatsapp/send
-```
-
-Body
+Todas as respostas utilizam:
 
 ```json
 {
-    "number": "5599999999999",
-    "text": "Olá"
+    "success": true,
+    "message": "...",
+    "data": {}
+}
+```
+
+Erros:
+
+```json
+{
+    "success": false,
+    "message": "...",
+    "error": {}
 }
 ```
 
 ---
 
-# Health (Planejado)
+# Organização das rotas
 
-GET
+Cada módulo possui sua própria rota.
 
+Exemplo:
+
+```txt
+/whatsapp
+/company
+/auth
+/users
+/inbox
+/messages
+/flows
+/ai-monitor
 ```
-/whatsapp/health
+
+Nunca criar rotas gigantes.
+
+---
+
+# AI Monitor
+
+Rotas atuais:
+
+```txt
+GET /ai-monitor/status
+
+GET /runtime-review
+
+GET /queue-review
+
+GET /log-review
+
+GET /full-review
+
+GET /executive-report
+
+GET /code-inventory
+
+GET /architecture-review
+
+GET /dependency-graph
+
+GET /technical-debt
+
+GET /production-readiness
+
+GET /api-map
+
+GET /lovable-api-guide
+
+GET /roadmap
+
+GET /architecture-advisor
+
+POST /advisor-chat
+
+POST /advisor-prompt
+
+POST /external-ai/advisor
+
+GET /external-ai/status
+
+POST /external-ai/configure
+
+POST /continuous/snapshot
+
+GET /continuous/history
+
+GET /project-memory
+
+POST /project-memory
+
+POST /project-memory/seed
+
+POST /project-memory/clear
+
+GET /scanner
+
+POST /scanner/scan-src
+
+POST /scanner/register
+
+POST /scanner/clear
+
+GET /module-health
+
+GET /security-scan
+
+GET /security-report
+
+GET /performance-scan
+
+GET /performance-report
+
+GET /refactoring-advisor
+
+GET /release-advisor
+
+GET /final-overview
 ```
 
 ---
 
-# Heartbeat (Planejado)
+# Futuras APIs
 
-GET
+Company
 
-```
-/whatsapp/heartbeat
-```
+Users
+
+Permissions
+
+JWT
+
+RBAC
+
+Billing
+
+Dashboard
+
+Analytics
+
+CRM
+
+Inbox
+
+Contacts
+
+Campaigns
+
+AI
+
+Events
+
+Webhooks
+
+Public API
 
 ---
 
-# Metrics (Planejado)
+# Convenções
 
 GET
 
+Consulta.
+
+POST
+
+Criar.
+
+PUT
+
+Atualizar.
+
+DELETE
+
+Remover.
+
+PATCH
+
+Atualização parcial.
+
+---
+
+# Versionamento
+
+Futuramente:
+
+```txt
+/api/v1/
+
+api/v2/
 ```
-/whatsapp/metrics
-```
+
+Nunca quebrar compatibilidade.
+
+---
+
+# Frontend
+
+Todo consumo será realizado pelo Lovable.
+
+Nunca mover regra crítica para React.
+
+React apenas consome APIs.
