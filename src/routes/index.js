@@ -11,6 +11,7 @@ import contactRoutes from "../modules/contact/index.js";
 import conversationRoutes from "../modules/conversation/index.js";
 import messageRoutes from "../modules/message/index.js";
 import inboxRoutes from "../modules/inbox/index.js";
+import aiMonitorRoutes from "../modules/ai-monitor/index.js";
 
 const router = Router();
 
@@ -45,5 +46,6 @@ router.use("/contact", contactRoutes);
 router.use("/conversation", conversationRoutes);
 router.use("/message", messageRoutes);
 router.use("/inbox", inboxRoutes);
+router.use("/ai-monitor", aiMonitorRoutes);
 
 export default router;
