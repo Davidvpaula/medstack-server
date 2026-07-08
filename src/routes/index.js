@@ -2,6 +2,8 @@ import { Router } from "express";
 import { response } from "../core/response.js";
 import { AppError } from "../core/errors/AppError.js";
 
+import healthRoutes from "./health.routes.js";
+
 import whatsappRoutes from "../modules/whatsapp/index.js";
 import companyRoutes from "../modules/company/index.js";
 import userRoutes from "../modules/user/index.js";
@@ -12,6 +14,7 @@ import conversationRoutes from "../modules/conversation/index.js";
 import messageRoutes from "../modules/message/index.js";
 import inboxRoutes from "../modules/inbox/index.js";
 import aiMonitorRoutes from "../modules/ai-monitor/index.js";
+import databaseRoutes from "./database.routes.js";
 
 const router = Router();
 
@@ -37,6 +40,8 @@ router.get("/teste-erro", (req, res) => {
     throw new AppError("Erro de teste funcionando.", 400);
 });
 
+router.use("/health", healthRoutes);
+
 router.use("/whatsapp", whatsappRoutes);
 router.use("/company", companyRoutes);
 router.use("/user", userRoutes);
@@ -47,5 +52,6 @@ router.use("/conversation", conversationRoutes);
 router.use("/message", messageRoutes);
 router.use("/inbox", inboxRoutes);
 router.use("/ai-monitor", aiMonitorRoutes);
+router.use("/database", databaseRoutes);
 
 export default router;

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: medstack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medstack
+      POSTGRES_PASSWORD: medstack_password
+      POSTGRES_DB: medstack_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - medstack_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  medstack_postgres_data:
