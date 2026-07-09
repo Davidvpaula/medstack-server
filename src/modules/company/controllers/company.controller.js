@@ -24,20 +24,24 @@ export function status(req, res) {
     );
 }
 
-export function list(req, res) {
-    return response.success(
-        res,
-        "Empresas carregadas.",
-        listCompanies()
-    );
+export async function list(req, res, next) {
+    try {
+        return response.success(
+            res,
+            "Empresas carregadas.",
+            await listCompanies()
+        );
+    } catch (error) {
+        next(error);
+    }
 }
 
-export function show(req, res, next) {
+export async function show(req, res, next) {
     try {
         return response.success(
             res,
             "Empresa carregada.",
-            getCompanyById(req.params.companyId)
+            await getCompanyById(req.params.companyId)
         );
     } catch (error) {
         next(error);

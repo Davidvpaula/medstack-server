@@ -18,32 +18,36 @@ export function status(req, res) {
     );
 }
 
-export function list(req, res) {
-    return response.success(
-        res,
-        "Usuários carregados.",
-        listUsers()
-    );
-}
-
-export function listByCompany(req, res, next) {
+export async function list(req, res, next) {
     try {
         return response.success(
             res,
-            "Usuários da empresa carregados.",
-            listUsersByCompany(req.params.companyId)
+            "Usuários carregados.",
+            await listUsers()
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function show(req, res, next) {
+export async function listByCompany(req, res, next) {
+    try {
+        return response.success(
+            res,
+            "Usuários da empresa carregados.",
+            await listUsersByCompany(req.params.companyId)
+        );
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function show(req, res, next) {
     try {
         return response.success(
             res,
             "Usuário carregado.",
-            getUserById(req.params.userId)
+            await getUserById(req.params.userId)
         );
     } catch (error) {
         next(error);

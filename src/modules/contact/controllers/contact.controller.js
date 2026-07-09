@@ -30,80 +30,84 @@ export function status(req, res) {
     );
 }
 
-export function list(req, res) {
-    return response.success(
-        res,
-        "Contatos carregados.",
-        listContacts()
-    );
+export async function list(req, res, next) {
+    try {
+        return response.success(
+            res,
+            "Contatos carregados.",
+            await listContacts()
+        );
+    } catch (error) {
+        next(error);
+    }
 }
 
-export function listByCompany(req, res, next) {
+export async function listByCompany(req, res, next) {
     try {
         return response.success(
             res,
             "Contatos da empresa carregados.",
-            listContactsByCompany(req.params.companyId)
+            await listContactsByCompany(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function favorites(req, res, next) {
+export async function favorites(req, res, next) {
     try {
         return response.success(
             res,
             "Contatos favoritos carregados.",
-            listFavoriteContacts(req.params.companyId)
+            await listFavoriteContacts(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function archived(req, res, next) {
+export async function archived(req, res, next) {
     try {
         return response.success(
             res,
             "Contatos arquivados carregados.",
-            listArchivedContacts(req.params.companyId)
+            await listArchivedContacts(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function blocked(req, res, next) {
+export async function blocked(req, res, next) {
     try {
         return response.success(
             res,
             "Contatos bloqueados carregados.",
-            listBlockedContacts(req.params.companyId)
+            await listBlockedContacts(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function show(req, res, next) {
+export async function show(req, res, next) {
     try {
         return response.success(
             res,
             "Contato carregado.",
-            getContactById(req.params.contactId)
+            await getContactById(req.params.contactId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function search(req, res, next) {
+export async function search(req, res, next) {
     try {
         return response.success(
             res,
             "Busca de contatos realizada.",
-            searchContactsByName(
+            await searchContactsByName(
                 req.params.companyId,
                 req.query.name
             )
@@ -113,12 +117,12 @@ export function search(req, res, next) {
     }
 }
 
-export function findByPhone(req, res, next) {
+export async function findByPhone(req, res, next) {
     try {
         return response.success(
             res,
             "Contato carregado por telefone.",
-            findContactByPhone(
+            await findContactByPhone(
                 req.params.companyId,
                 req.query.phone
             )

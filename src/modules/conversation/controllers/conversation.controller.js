@@ -31,44 +31,48 @@ export function status(req, res) {
     );
 }
 
-export function list(req, res) {
-    return response.success(
-        res,
-        "Conversas carregadas.",
-        listConversations()
-    );
+export async function list(req, res, next) {
+    try {
+        return response.success(
+            res,
+            "Conversas carregadas.",
+            await listConversations()
+        );
+    } catch (error) {
+        next(error);
+    }
 }
 
-export function listByCompany(req, res, next) {
+export async function listByCompany(req, res, next) {
     try {
         return response.success(
             res,
             "Conversas da empresa carregadas.",
-            listConversationsByCompany(req.params.companyId)
+            await listConversationsByCompany(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function listByContact(req, res, next) {
+export async function listByContact(req, res, next) {
     try {
         return response.success(
             res,
             "Conversas do contato carregadas.",
-            listConversationsByContact(req.params.contactId)
+            await listConversationsByContact(req.params.contactId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function show(req, res, next) {
+export async function show(req, res, next) {
     try {
         return response.success(
             res,
             "Conversa carregada.",
-            getConversationById(req.params.conversationId)
+            await getConversationById(req.params.conversationId)
         );
     } catch (error) {
         next(error);

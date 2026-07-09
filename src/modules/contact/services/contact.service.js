@@ -1,9 +1,12 @@
 import { AppError } from "../../../core/errors/AppError.js";
 
-import { companyRepository } from "../../company/repositories/company.repository.js";
+import {
+    companyPostgresRepository
+} from "../../../database/repositories/company.postgres.repository.js";
 
-import { Contact } from "../entities/contact.entity.js";
-import { contactRepository } from "../repositories/contact.repository.js";
+import {
+    contactPostgresRepository
+} from "../../../database/repositories/contact.postgres.repository.js";
 
 import { CONTACT_STATUS } from "../constants/contact-status.constants.js";
 
@@ -15,22 +18,23 @@ import {
 export function getContactStatus() {
     return {
         module: "contact",
-        status: "active"
+        status: "active",
+        persistence: "postgres"
     };
 }
 
-export function listContacts() {
-    return contactRepository.list();
+export async function listContacts() {
+    return contactPostgresRepository.listContacts();
 }
 
-export function listContactsByCompany(companyId) {
-    ensureCompanyExists(companyId);
+export async function listContactsByCompany(companyId) {
+    await ensureCompanyExists(companyId);
 
-    return contactRepository.listByCompany(companyId);
+    return contactPostgresRepository.listContactsByCompany(companyId);
 }
 
-export function getContactById(contactId) {
-    const contact = contactRepository.findById(contactId);
+export async function getContactById(contactId) {
+    const contact = await contactPostgresRepository.findContactById(contactId);
 
     if (!contact) {
         throw new AppError("Contato não encontrado.", 404);
@@ -39,18 +43,21 @@ export function getContactById(contactId) {
     return contact;
 }
 
-export function searchContactsByName(companyId, name) {
-    ensureCompanyExists(companyId);
+export async function searchContactsByName(companyId, name) {
+    await ensureCompanyExists(companyId);
 
-    return contactRepository.searchByName(companyId, name);
+    return contactPostgresRepository.searchContactsByName(companyId, name);
 }
 
-export function findContactByPhone(companyId, phone) {
-    ensureCompanyExists(companyId);
+export async function findContactByPhone(companyId, phone) {
+    await ensureCompanyExists(companyId);
 
     const phoneNormalized = normalizePhone(phone);
 
-    const contact = contactRepository.findByPhone(companyId, phoneNormalized);
+    const contact = await contactPostgresRepository.findContactByPhone(
+        companyId,
+        phoneNormalized
+    );
 
     if (!contact) {
         throw new AppError("Contato não encontrado.", 404);
@@ -59,22 +66,22 @@ export function findContactByPhone(companyId, phone) {
     return contact;
 }
 
-export function listFavoriteContacts(companyId) {
-    ensureCompanyExists(companyId);
+export async function listFavoriteContacts(companyId) {
+    await ensureCompanyExists(companyId);
 
-    return contactRepository.listFavorites(companyId);
+    return contactPostgresRepository.listFavoriteContacts(companyId);
 }
 
-export function listArchivedContacts(companyId) {
-    ensureCompanyExists(companyId);
+export async function listArchivedContacts(companyId) {
+    await ensureCompanyExists(companyId);
 
-    return contactRepository.listArchived(companyId);
+    return contactPostgresRepository.listArchivedContacts(companyId);
 }
 
-export function listBlockedContacts(companyId) {
-    ensureCompanyExists(companyId);
+export async function listBlockedContacts(companyId) {
+    await ensureCompanyExists(companyId);
 
-    return contactRepository.listBlocked(companyId);
+    return contactPostgresRepository.listBlockedContacts(companyId);
 }
 
 export async function createContact(data) {
@@ -84,11 +91,11 @@ export async function createContact(data) {
         throw new AppError(validationErrors.join(" "), 400);
     }
 
-    const company = ensureCompanyExists(data.companyId);
+    const company = await ensureCompanyExists(data.companyId);
 
     const phoneNormalized = normalizePhone(data.phone);
 
-    const existingContact = contactRepository.findByPhone(
+    const existingContact = await contactPostgresRepository.findContactByPhone(
         company.id,
         phoneNormalized
     );
@@ -97,33 +104,15 @@ export async function createContact(data) {
         throw new AppError("Já existe um contato com este telefone.", 409);
     }
 
-    const contact = new Contact({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    return contactPostgresRepository.createContact({
         companyId: company.id,
         name: data.name,
-        phone: data.phone,
-        email: data.email || "",
-        avatar: data.avatar || "",
-        city: data.city || "",
-        state: data.state || "",
-        country: data.country || "Brasil",
-        document: data.document || "",
-        birthDate: data.birthDate || null,
+        phone: phoneNormalized,
+        email: data.email || null,
         source: data.source || "manual",
-        channel: data.channel || "whatsapp",
-        ownerId: data.ownerId || null,
         status: data.status || CONTACT_STATUS.ACTIVE,
-        tags: data.tags || [],
-        notes: data.notes || [],
-        customFields: data.customFields || {},
-        metadata: data.metadata || {}
+        metadata: buildContactMetadata(data)
     });
-
-    company.updateStatistics({
-        contacts: (company.statistics.contacts || 0) + 1
-    });
-
-    return contactRepository.create(contact);
 }
 
 export async function updateContact(contactId, data) {
@@ -133,7 +122,7 @@ export async function updateContact(contactId, data) {
         throw new AppError(validationErrors.join(" "), 400);
     }
 
-    const contact = getContactById(contactId);
+    const contact = await getContactById(contactId);
 
     const updateData = {
         ...data
@@ -142,7 +131,7 @@ export async function updateContact(contactId, data) {
     if (updateData.phone) {
         const phoneNormalized = normalizePhone(updateData.phone);
 
-        const existingContact = contactRepository.findByPhone(
+        const existingContact = await contactPostgresRepository.findContactByPhone(
             contact.companyId,
             phoneNormalized
         );
@@ -150,23 +139,29 @@ export async function updateContact(contactId, data) {
         if (existingContact && existingContact.id !== contact.id) {
             throw new AppError("Já existe um contato com este telefone.", 409);
         }
+
+        updateData.phone = phoneNormalized;
     }
 
-    return contactRepository.update(contactId, updateData);
+    const metadata = {
+        ...(contact.metadata || {}),
+        ...buildContactMetadata(updateData)
+    };
+
+    return contactPostgresRepository.updateContact(contactId, {
+        name: updateData.name,
+        phone: updateData.phone,
+        email: updateData.email,
+        source: updateData.source,
+        status: updateData.status,
+        metadata
+    });
 }
 
 export async function deleteContact(contactId) {
-    const contact = getContactById(contactId);
+    await getContactById(contactId);
 
-    const company = companyRepository.findById(contact.companyId);
-
-    if (company) {
-        company.updateStatistics({
-            contacts: Math.max((company.statistics.contacts || 1) - 1, 0)
-        });
-    }
-
-    contactRepository.remove(contactId);
+    await contactPostgresRepository.softDeleteContact(contactId);
 
     return {
         deleted: true,
@@ -175,67 +170,88 @@ export async function deleteContact(contactId) {
 }
 
 export async function favoriteContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        favorite: true
+    return contactPostgresRepository.updateContact(contactId, {
+        metadata: {
+            ...(contact.metadata || {}),
+            favorite: true
+        }
     });
 }
 
 export async function unfavoriteContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        favorite: false
+    return contactPostgresRepository.updateContact(contactId, {
+        metadata: {
+            ...(contact.metadata || {}),
+            favorite: false
+        }
     });
 }
 
 export async function archiveContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        archived: true,
-        status: CONTACT_STATUS.ARCHIVED
+    return contactPostgresRepository.updateContact(contactId, {
+        status: CONTACT_STATUS.ARCHIVED,
+        metadata: {
+            ...(contact.metadata || {}),
+            archived: true
+        }
     });
 }
 
 export async function unarchiveContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        archived: false,
-        status: CONTACT_STATUS.ACTIVE
+    return contactPostgresRepository.updateContact(contactId, {
+        status: CONTACT_STATUS.ACTIVE,
+        metadata: {
+            ...(contact.metadata || {}),
+            archived: false
+        }
     });
 }
 
 export async function blockContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        blocked: true,
-        status: CONTACT_STATUS.BLOCKED
+    return contactPostgresRepository.updateContact(contactId, {
+        status: CONTACT_STATUS.BLOCKED,
+        metadata: {
+            ...(contact.metadata || {}),
+            blocked: true
+        }
     });
 }
 
 export async function unblockContact(contactId) {
-    getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    return contactRepository.update(contactId, {
-        blocked: false,
-        status: CONTACT_STATUS.ACTIVE
+    return contactPostgresRepository.updateContact(contactId, {
+        status: CONTACT_STATUS.ACTIVE,
+        metadata: {
+            ...(contact.metadata || {}),
+            blocked: false
+        }
     });
 }
 
 export async function markContactActivity(contactId) {
-    const contact = getContactById(contactId);
+    const contact = await getContactById(contactId);
 
-    contact.markActivity();
-
-    return contact;
+    return contactPostgresRepository.updateContact(contactId, {
+        metadata: {
+            ...(contact.metadata || {}),
+            lastActivityAt: new Date().toISOString()
+        }
+    });
 }
 
-function ensureCompanyExists(companyId) {
-    const company = companyRepository.findById(companyId);
+async function ensureCompanyExists(companyId) {
+    const company = await companyPostgresRepository.findCompanyById(companyId);
 
     if (!company) {
         throw new AppError("Empresa não encontrada.", 404);
@@ -246,4 +262,24 @@ function ensureCompanyExists(companyId) {
 
 function normalizePhone(phone) {
     return String(phone || "").replace(/\D/g, "");
+}
+
+function buildContactMetadata(data = {}) {
+    return {
+        avatar: data.avatar || "",
+        city: data.city || "",
+        state: data.state || "",
+        country: data.country || "Brasil",
+        document: data.document || "",
+        birthDate: data.birthDate || null,
+        channel: data.channel || "whatsapp",
+        ownerId: data.ownerId || null,
+        tags: data.tags || [],
+        notes: data.notes || [],
+        customFields: data.customFields || {},
+        favorite: Boolean(data.favorite),
+        archived: Boolean(data.archived),
+        blocked: Boolean(data.blocked),
+        ...(data.metadata || {})
+    };
 }

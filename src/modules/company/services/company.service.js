@@ -1,7 +1,8 @@
 import { AppError } from "../../../core/errors/AppError.js";
 
-import { Company } from "../entities/company.entity.js";
-import { companyRepository } from "../repositories/company.repository.js";
+import {
+    companyPostgresRepository
+} from "../../../database/repositories/company.postgres.repository.js";
 
 import {
     COMPANY_DEFAULT_CONFIG,
@@ -14,16 +15,17 @@ import { createSlug } from "../utils/slug.util.js";
 export function getCompanyStatus() {
     return {
         module: "company",
-        status: "active"
+        status: "active",
+        persistence: "postgres"
     };
 }
 
-export function listCompanies() {
-    return companyRepository.list();
+export async function listCompanies() {
+    return companyPostgresRepository.listCompanies();
 }
 
-export function getCompanyById(companyId) {
-    const company = companyRepository.findById(companyId);
+export async function getCompanyById(companyId) {
+    const company = await companyPostgresRepository.findCompanyById(companyId);
 
     if (!company) {
         throw new AppError("Empresa não encontrada.", 404);
@@ -39,7 +41,7 @@ export async function createCompany(data) {
 
     const slug = data.slug || createSlug(data.name);
 
-    const existingCompany = companyRepository.findBySlug(slug);
+    const existingCompany = await companyPostgresRepository.findCompanyBySlug(slug);
 
     if (existingCompany) {
         throw new AppError("Já existe uma empresa com este slug.", 409);
@@ -48,27 +50,29 @@ export async function createCompany(data) {
     const plan = data.plan || COMPANY_PLANS.FREE;
     const planLimits = getCompanyPlanLimits(plan);
 
-    const company = new Company({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    return companyPostgresRepository.createCompany({
         name: data.name,
         slug,
         status: data.status || COMPANY_DEFAULT_CONFIG.status,
         plan,
-        timezone: data.timezone || COMPANY_DEFAULT_CONFIG.timezone,
-        language: data.language || COMPANY_DEFAULT_CONFIG.language,
-        limits: {
-            ...planLimits,
-            ...(data.limits || {})
-        },
-        settings: data.settings || COMPANY_DEFAULT_CONFIG.settings,
-        metadata: data.metadata || COMPANY_DEFAULT_CONFIG.metadata
+        document: data.document || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        metadata: {
+            timezone: data.timezone || COMPANY_DEFAULT_CONFIG.timezone,
+            language: data.language || COMPANY_DEFAULT_CONFIG.language,
+            limits: {
+                ...planLimits,
+                ...(data.limits || {})
+            },
+            settings: data.settings || COMPANY_DEFAULT_CONFIG.settings,
+            ...(data.metadata || {})
+        }
     });
-
-    return companyRepository.create(company);
 }
 
 export async function updateCompany(companyId, data) {
-    const company = getCompanyById(companyId);
+    const company = await getCompanyById(companyId);
 
     const updateData = {
         ...data
@@ -79,27 +83,58 @@ export async function updateCompany(companyId, data) {
     }
 
     if (updateData.slug) {
-        const existingCompany = companyRepository.findBySlug(updateData.slug);
+        const existingCompany = await companyPostgresRepository.findCompanyBySlug(
+            updateData.slug
+        );
 
         if (existingCompany && existingCompany.id !== company.id) {
             throw new AppError("Já existe uma empresa com este slug.", 409);
         }
     }
 
+    const metadata = {
+        ...(company.metadata || {})
+    };
+
     if (updateData.plan) {
-        updateData.limits = {
+        metadata.limits = {
             ...getCompanyPlanLimits(updateData.plan),
-            ...(updateData.limits || {})
+            ...(data.limits || {})
         };
     }
 
-    return companyRepository.update(companyId, updateData);
+    if (data.timezone) {
+        metadata.timezone = data.timezone;
+    }
+
+    if (data.language) {
+        metadata.language = data.language;
+    }
+
+    if (data.settings) {
+        metadata.settings = data.settings;
+    }
+
+    if (data.metadata) {
+        Object.assign(metadata, data.metadata);
+    }
+
+    return companyPostgresRepository.updateCompany(companyId, {
+        name: updateData.name,
+        slug: updateData.slug,
+        status: updateData.status,
+        plan: updateData.plan,
+        document: updateData.document,
+        email: updateData.email,
+        phone: updateData.phone,
+        metadata
+    });
 }
 
 export async function deleteCompany(companyId) {
-    getCompanyById(companyId);
+    await getCompanyById(companyId);
 
-    companyRepository.remove(companyId);
+    await companyPostgresRepository.softDeleteCompany(companyId);
 
     return {
         deleted: true,

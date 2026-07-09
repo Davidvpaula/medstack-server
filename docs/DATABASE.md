@@ -1,165 +1,30 @@
-# Banco de Dados
+# DATABASE — MEDSTACK SERVER
 
-## Filosofia
+## Status
 
-Nenhum Service acessa banco diretamente.
+PostgreSQL local com Docker concluído.
 
-Fluxo oficial:
+A camada de banco já possui:
 
-Controller
-
-↓
-
-Service
-
-↓
-
-Repository
-
-↓
-
-Database
+- Docker Compose
+- PostgreSQL 16
+- Pool de conexão
+- Health Check
+- Migration Runner
+- Seed System
+- BaseRepository
+- BaseCompanyRepository
+- Repository Utils
+- Repositories PostgreSQL iniciais
+- Database Dashboard
 
 ---
 
-# Banco Atual
+# Docker
 
-Store em memória.
+O PostgreSQL local roda via Docker.
 
----
+Arquivo:
 
-# Banco Futuro
-
-Supabase
-
-PostgreSQL
-
-Redis
-
----
-
-# Tabelas Planejadas
-
-## companies
-
-Empresas
-
----
-
-## users
-
-Usuários
-
----
-
-## instances
-
-Instâncias WhatsApp
-
----
-
-## contacts
-
-Contatos
-
----
-
-## conversations
-
-Conversas
-
----
-
-## messages
-
-Mensagens
-
----
-
-## labels
-
-Etiquetas
-
----
-
-## notes
-
-Notas
-
----
-
-## flows
-
-Fluxos
-
----
-
-## flow_nodes
-
-Nós
-
----
-
-## ai_sessions
-
-Sessões IA
-
----
-
-## ai_messages
-
-Mensagens IA
-
----
-
-## subscriptions
-
-Assinaturas
-
----
-
-## invoices
-
-Cobranças
-
----
-
-## api_keys
-
-API Pública
-
----
-
-## webhooks
-
-Webhooks
-
----
-
-## logs
-
-Logs
-
----
-
-## metrics
-
-Métricas
-
----
-
-## jobs
-
-Filas
-
----
-
-## files
-
-Arquivos
-
----
-
-## uploads
-
-Uploads
+```txt
+docker-compose.yml
