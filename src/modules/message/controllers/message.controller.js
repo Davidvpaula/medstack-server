@@ -24,56 +24,60 @@ export function status(req, res) {
     );
 }
 
-export function list(req, res) {
-    return response.success(
-        res,
-        "Mensagens carregadas.",
-        listMessages()
-    );
+export async function list(req, res, next) {
+    try {
+        return response.success(
+            res,
+            "Mensagens carregadas.",
+            await listMessages()
+        );
+    } catch (error) {
+        next(error);
+    }
 }
 
-export function listByCompany(req, res, next) {
+export async function listByCompany(req, res, next) {
     try {
         return response.success(
             res,
             "Mensagens da empresa carregadas.",
-            listMessagesByCompany(req.params.companyId)
+            await listMessagesByCompany(req.params.companyId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function listByConversation(req, res, next) {
+export async function listByConversation(req, res, next) {
     try {
         return response.success(
             res,
             "Mensagens da conversa carregadas.",
-            listMessagesByConversation(req.params.conversationId)
+            await listMessagesByConversation(req.params.conversationId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function listByContact(req, res, next) {
+export async function listByContact(req, res, next) {
     try {
         return response.success(
             res,
             "Mensagens do contato carregadas.",
-            listMessagesByContact(req.params.contactId)
+            await listMessagesByContact(req.params.contactId)
         );
     } catch (error) {
         next(error);
     }
 }
 
-export function show(req, res, next) {
+export async function show(req, res, next) {
     try {
         return response.success(
             res,
             "Mensagem carregada.",
-            getMessageById(req.params.messageId)
+            await getMessageById(req.params.messageId)
         );
     } catch (error) {
         next(error);

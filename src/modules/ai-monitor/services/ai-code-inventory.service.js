@@ -1,175 +1,333 @@
-import fs from "fs";
 import path from "path";
 
-const SRC_PATH = path.resolve("src");
+import {
+    listScannedFiles
+} from "./ai-code-scanner.service.js";
 
-const FILE_TYPES = {
-    controller: "controllers",
-    service: "services",
-    route: "routes",
-    repository: "repositories",
-    worker: "workers",
-    queue: "queues",
-    provider: "providers"
-};
+const SRC_PATH =
+    path.resolve("src");
+
+const INVENTORY_TYPES = [
+    "controller",
+    "service",
+    "route",
+    "repository",
+    "worker",
+    "queue",
+    "provider"
+];
 
 export function getCodeInventory() {
-    const files = scanDirectory(SRC_PATH);
+    const scannedFiles =
+        listScannedFiles();
+
+    const files =
+        scannedFiles.map(
+            normalizeInventoryFile
+        );
 
     const inventory = {
-        generatedAt: new Date().toISOString(),
-        root: SRC_PATH,
+        generatedAt:
+            new Date().toISOString(),
+
+        root:
+            SRC_PATH,
+
         summary: {
-            totalFiles: files.length,
-            controllers: 0,
-            services: 0,
-            routes: 0,
-            repositories: 0,
-            workers: 0,
-            queues: 0,
-            providers: 0,
-            modules: 0
+            totalFiles:
+                files.length,
+
+            controllers:
+                0,
+
+            services:
+                0,
+
+            routes:
+                0,
+
+            repositories:
+                0,
+
+            workers:
+                0,
+
+            queues:
+                0,
+
+            providers:
+                0,
+
+            modules:
+                0
         },
+
         modules: {},
+
         files
     };
 
     for (const file of files) {
-        const moduleName = getModuleName(file.relativePath);
+        const moduleName =
+            getModuleName(
+                file.relativePath
+            );
 
         if (moduleName) {
-            if (!inventory.modules[moduleName]) {
-                inventory.modules[moduleName] = {
-                    name: moduleName,
-                    files: [],
-                    controllers: 0,
-                    services: 0,
-                    routes: 0,
-                    repositories: 0,
-                    workers: 0,
-                    queues: 0,
-                    providers: 0
-                };
-            }
+            ensureInventoryModule(
+                inventory,
+                moduleName
+            );
 
-            inventory.modules[moduleName].files.push(file);
+            inventory
+                .modules[moduleName]
+                .files
+                .push(file);
         }
 
-        classifyFile(file, inventory, moduleName);
+        classifyFile(
+            file,
+            inventory,
+            moduleName
+        );
     }
 
-    inventory.summary.modules = Object.keys(inventory.modules).length;
+    inventory.summary.modules =
+        Object.keys(
+            inventory.modules
+        ).length;
 
     return inventory;
 }
 
-function scanDirectory(directory) {
-    const result = [];
+function normalizeInventoryFile(
+    file = {}
+) {
+    const relativePath =
+        String(
+            file.path || ""
+        );
 
-    if (!fs.existsSync(directory)) {
-        return result;
-    }
+    const metadata =
+        safeObject(
+            file.metadata
+        );
 
-    const entries = fs.readdirSync(directory, {
-        withFileTypes: true
-    });
+    const absolutePath =
+        metadata.absolutePath
+        || path.resolve(
+            relativePath
+        );
 
-    for (const entry of entries) {
-        const fullPath = path.join(directory, entry.name);
+    return {
+        name:
+            metadata.fileName
+            || path.basename(
+                relativePath
+            ),
 
-        if (shouldIgnore(fullPath)) {
-            continue;
-        }
+        path:
+            absolutePath,
 
-        if (entry.isDirectory()) {
-            result.push(...scanDirectory(fullPath));
-            continue;
-        }
+        relativePath,
 
-        if (!entry.name.endsWith(".js")) {
-            continue;
-        }
+        size:
+            toNumber(
+                metadata.size
+            ),
 
-        const content = fs.readFileSync(fullPath, "utf-8");
+        lines:
+            toNumber(
+                file.lines
+            ),
 
-        result.push({
-            name: entry.name,
-            path: fullPath,
-            relativePath: path.relative(process.cwd(), fullPath),
-            size: content.length,
-            lines: content.split("\n").length,
-            exports: extractExports(content),
-            imports: extractImports(content),
-            createdAt: null,
-            updatedAt: null
-        });
-    }
+        exports:
+            toArray(
+                file.exports
+            ),
 
-    return result;
+        imports:
+            toArray(
+                file.imports
+            ),
+
+        module:
+            String(
+                file.module
+                || ""
+            ),
+
+        type:
+            String(
+                file.type
+                || "unknown"
+            ),
+
+        createdAt:
+            file.createdAt
+            || null,
+
+        updatedAt:
+            null
+    };
 }
 
-function shouldIgnore(filePath) {
-    return (
-        filePath.includes("node_modules")
-        || filePath.includes("sessions")
-        || filePath.includes("logs")
-        || filePath.includes("backups")
-        || filePath.includes("uploads")
-    );
+function ensureInventoryModule(
+    inventory,
+    moduleName
+) {
+    if (
+        inventory
+            .modules[moduleName]
+    ) {
+        return;
+    }
+
+    inventory.modules[moduleName] = {
+        name:
+            moduleName,
+
+        files: [],
+
+        controllers:
+            0,
+
+        services:
+            0,
+
+        routes:
+            0,
+
+        repositories:
+            0,
+
+        workers:
+            0,
+
+        queues:
+            0,
+
+        providers:
+            0
+    };
 }
 
-function getModuleName(relativePath) {
-    const parts = relativePath.split(path.sep);
+function getModuleName(
+    relativePath
+) {
+    const normalized =
+        String(
+            relativePath || ""
+        ).replaceAll(
+            "\\",
+            "/"
+        );
 
-    const modulesIndex = parts.indexOf("modules");
+    const parts =
+        normalized.split("/");
 
-    if (modulesIndex === -1) {
+    const modulesIndex =
+        parts.indexOf(
+            "modules"
+        );
+
+    if (
+        modulesIndex === -1
+    ) {
         return null;
     }
 
-    return parts[modulesIndex + 1] || null;
+    return (
+        parts[
+            modulesIndex + 1
+        ]
+        || null
+    );
 }
 
-function classifyFile(file, inventory, moduleName) {
-    const normalized = file.relativePath.replaceAll("\\", "/");
+function classifyFile(
+    file,
+    inventory,
+    moduleName
+) {
+    const type =
+        String(
+            file.type || ""
+        );
 
-    for (const [key, folder] of Object.entries(FILE_TYPES)) {
-        if (normalized.includes(`/${folder}/`)) {
-            const plural = `${key}s`;
+    if (
+        !INVENTORY_TYPES.includes(
+            type
+        )
+    ) {
+        return;
+    }
 
-            inventory.summary[plural] += 1;
+    const plural =
+        getPluralKey(
+            type
+        );
 
-            if (moduleName && inventory.modules[moduleName]) {
-                inventory.modules[moduleName][plural] += 1;
-            }
-        }
+    inventory
+        .summary[plural] += 1;
+
+    if (
+        moduleName
+        && inventory
+            .modules[moduleName]
+    ) {
+        inventory
+            .modules[moduleName][plural]
+            += 1;
     }
 }
 
-function extractImports(content) {
-    const imports = [];
-
-    const regex = /import\s+[\s\S]*?\s+from\s+["'](.+?)["']/g;
-
-    let match;
-
-    while ((match = regex.exec(content)) !== null) {
-        imports.push(match[1]);
+function getPluralKey(
+    type
+) {
+    if (
+        type === "repository"
+    ) {
+        return "repositories";
     }
 
-    return imports;
+    return `${type}s`;
 }
 
-function extractExports(content) {
-    const exports = [];
+function safeObject(
+    value
+) {
+    return (
+        value
+        && typeof value
+            === "object"
+        && !Array.isArray(
+            value
+        )
+    )
+        ? value
+        : {};
+}
 
-    const regex = /export\s+(?:async\s+)?function\s+([a-zA-Z0-9_]+)/g;
+function toArray(
+    value
+) {
+    return Array.isArray(
+        value
+    )
+        ? [...value]
+        : [];
+}
 
-    let match;
+function toNumber(
+    value
+) {
+    const number =
+        Number(value);
 
-    while ((match = regex.exec(content)) !== null) {
-        exports.push(match[1]);
-    }
-
-    return exports;
+    return Number.isFinite(
+        number
+    )
+        ? number
+        : 0;
 }

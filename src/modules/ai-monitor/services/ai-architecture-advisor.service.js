@@ -11,229 +11,969 @@ import {
 } from "./ai-technical-debt.service.js";
 
 import {
-    getProductionReadinessReport
-} from "./ai-production-readiness.service.js";
+    getModuleHealthReport
+} from "./ai-module-health.service.js";
 
 import {
     getRoadmapAnalysis
 } from "./ai-roadmap.service.js";
 
+import {
+    clampScore,
+    createReport,
+    formatReportItem,
+    normalizeReport,
+    safeObject,
+    toArray,
+    toNumber,
+    uniqueStrings
+} from "./ai-report-utils.service.js";
+
 export function getArchitectureAdvisorReport() {
-    const health = getFullHealthReview();
-    const architecture = getArchitectureReview();
-    const technicalDebt = getTechnicalDebtReport();
-    const production = getProductionReadinessReport();
-    const roadmap = getRoadmapAnalysis();
+    const health =
+        normalizeHealth(
+            getFullHealthReview()
+        );
+
+    const architecture =
+        normalizeReport(
+            getArchitectureReview(),
+            {
+                type:
+                    "architecture_review"
+            }
+        );
+
+    const technicalDebt =
+        normalizeTechnicalDebt(
+            getTechnicalDebtReport()
+        );
+
+    const moduleHealth =
+        normalizeReport(
+            getModuleHealthReport(),
+            {
+                type:
+                    "module_health_report"
+            }
+        );
+
+    const roadmap =
+        normalizeRoadmap(
+            getRoadmapAnalysis()
+        );
+
+    const score =
+        calculateAdvisorScore({
+            architecture,
+            technicalDebt,
+            moduleHealth,
+            health
+        });
+
+    const blockers =
+        buildBlockers({
+            architecture,
+            technicalDebt,
+            moduleHealth
+        });
+
+    const warnings =
+        buildWarnings({
+            health,
+            architecture,
+            technicalDebt,
+            moduleHealth
+        });
+
+    const immediatePriorities =
+        getImmediatePriorities({
+            health,
+            architecture,
+            technicalDebt,
+            moduleHealth,
+            roadmap
+        });
+
+    const recommendations =
+        buildRecommendations({
+            architecture,
+            technicalDebt,
+            moduleHealth
+        });
+
+    const nextSteps =
+        buildNextSteps({
+            blockers,
+            roadmap,
+            architecture
+        });
+
+    const architecturalReadiness =
+        buildArchitecturalReadiness({
+            score,
+            blockers,
+            architecture,
+            technicalDebt,
+            moduleHealth
+        });
+
+    const summary = {
+        architectureScore:
+            architecture.score,
+
+        architectureStatus:
+            architecture.status,
+
+        moduleHealthScore:
+            moduleHealth.score,
+
+        moduleHealthStatus:
+            moduleHealth.status,
+
+        technicalDebtScore:
+            technicalDebt.score,
+
+        technicalDebtStatus:
+            technicalDebt.status,
+
+        technicalDebts:
+            technicalDebt
+                .summary
+                .total,
+
+        highTechnicalDebts:
+            technicalDebt
+                .summary
+                .high,
+
+        criticalTechnicalDebts:
+            technicalDebt
+                .summary
+                .critical,
+
+        architectureSuggestions:
+            toArray(
+                architecture.suggestions
+            ).length,
+
+        criticalModules:
+            toNumber(
+                moduleHealth
+                    .summary
+                    .criticalRisk
+            ),
+
+        highRiskModules:
+            toNumber(
+                moduleHealth
+                    .summary
+                    .highRisk
+            ),
+
+        roadmapProgress:
+            roadmap.progress,
+
+        runtimeErrors:
+            health.logErrors,
+
+        runtimeWarnings:
+            health.logWarnings
+    };
+
+    return createReport({
+        type:
+            "architecture_advisor_report",
+
+        score,
+
+        status:
+            getAdvisorStatus({
+                score,
+                blockers
+            }),
+
+        summary,
+
+        blockers,
+
+        warnings,
+
+        recommendations,
+
+        nextSteps,
+
+        data: {
+            currentStage:
+                getCurrentStage({
+                    roadmap,
+                    architecture,
+                    moduleHealth
+                }),
+
+            globalAssessment:
+                getGlobalAssessment({
+                    score,
+                    blockers
+                }),
+
+            immediatePriorities,
+
+            canMoveForward:
+                architecturalReadiness,
+
+            productionOpinion:
+                getProductionOpinion(
+                    architecturalReadiness
+                ),
+
+            scalingOpinion:
+                getScalingOpinion({
+                    technicalDebt,
+                    moduleHealth
+                }),
+
+            recommendedNextModule:
+                getRecommendedNextModule(
+                    roadmap
+                )
+        }
+    });
+}
+
+function calculateAdvisorScore({
+    architecture,
+    technicalDebt,
+    moduleHealth,
+    health
+}) {
+    let score =
+        architecture.score * 0.40
+        + moduleHealth.score * 0.35
+        + technicalDebt.score * 0.20
+        + 100 * 0.05;
+
+    score -= Math.min(
+        health.logErrors * 2,
+        10
+    );
+
+    return clampScore(
+        score
+    );
+}
+
+function getAdvisorStatus({
+    score,
+    blockers
+}) {
+    if (blockers.length > 0) {
+        return "architecture_blocked";
+    }
+
+    if (score >= 90) {
+        return "architecture_healthy";
+    }
+
+    if (score >= 75) {
+        return "architecture_controlled";
+    }
+
+    if (score >= 55) {
+        return "architecture_needs_attention";
+    }
+
+    return "architecture_high_risk";
+}
+
+function buildArchitecturalReadiness({
+    score,
+    blockers,
+    architecture,
+    technicalDebt,
+    moduleHealth
+}) {
+    const noBlockers =
+        blockers.length === 0;
+
+    const noCriticalDebt =
+        toNumber(
+            technicalDebt
+                .summary
+                .critical
+        ) === 0;
+
+    const noCriticalModules =
+        toNumber(
+            moduleHealth
+                .summary
+                .criticalRisk
+        ) === 0;
+
+    const betaAssisted =
+        score >= 75
+        && noBlockers
+        && noCriticalDebt
+        && noCriticalModules;
+
+    const productionSmallScale =
+        score >= 85
+        && noBlockers
+        && architecture.score >= 80;
+
+    const productionLargeScale =
+        score >= 92
+        && noBlockers
+        && technicalDebt.score >= 85
+        && moduleHealth.score >= 85;
 
     return {
-        type: "architecture_advisor_report",
-        generatedAt: new Date().toISOString(),
-        currentStage: getCurrentStage(roadmap),
-        globalAssessment: getGlobalAssessment(production),
-        immediatePriorities: getImmediatePriorities({
-            health,
-            architecture,
-            technicalDebt,
-            production,
-            roadmap
-        }),
-        canMoveForward: canMoveForward(production),
-        productionOpinion: getProductionOpinion(production),
-        scalingOpinion: getScalingOpinion({
-            technicalDebt,
-            production
-        }),
-        recommendedNextModule: getRecommendedNextModule(roadmap),
-        warnings: getWarnings({
-            health,
-            architecture,
-            technicalDebt,
-            production
-        }),
-        summary: {
-            productionScore: production.score,
-            productionStatus: production.status,
-            technicalDebts: technicalDebt.summary.total,
-            highTechnicalDebts: technicalDebt.summary.high,
-            criticalTechnicalDebts: technicalDebt.summary.critical,
-            architectureSuggestions: architecture.suggestions.length,
-            roadmapProgress: roadmap.progress
-        }
+        betaAssisted,
+
+        productionSmallScale,
+
+        productionLargeScale,
+
+        reason:
+            getReadinessReason({
+                betaAssisted,
+                productionSmallScale,
+                productionLargeScale,
+                blockers
+            })
     };
 }
 
-function getCurrentStage(roadmap) {
-    if (roadmap.progress >= 90) {
-        return "production_preparation";
+function getReadinessReason({
+    betaAssisted,
+    productionSmallScale,
+    productionLargeScale,
+    blockers
+}) {
+    if (blockers.length > 0) {
+        return (
+            "Existem blockers arquiteturais "
+            + "que precisam ser corrigidos."
+        );
     }
 
-    if (roadmap.progress >= 60) {
-        return "frontend_and_infrastructure";
+    if (productionLargeScale) {
+        return (
+            "Arquitetura estruturalmente "
+            + "saudável para preparação de escala."
+        );
     }
 
-    if (roadmap.progress >= 40) {
+    if (productionSmallScale) {
+        return (
+            "Arquitetura adequada para "
+            + "produção de pequena escala."
+        );
+    }
+
+    if (betaAssisted) {
+        return (
+            "Arquitetura adequada para "
+            + "beta assistido com monitoramento."
+        );
+    }
+
+    return (
+        "Ainda existem riscos estruturais "
+        + "que precisam de acompanhamento."
+    );
+}
+
+function getCurrentStage({
+    roadmap,
+    architecture,
+    moduleHealth
+}) {
+    if (
+        architecture.score >= 90
+        && moduleHealth.score >= 90
+    ) {
+        return "architecture_stabilized";
+    }
+
+    if (
+        architecture.score >= 75
+    ) {
+        return "controlled_architecture_cleanup";
+    }
+
+    if (
+        roadmap.progress >= 60
+    ) {
+        return "infrastructure_with_architecture_review";
+    }
+
+    if (
+        roadmap.progress >= 40
+    ) {
         return "backend_consolidation";
     }
 
     return "foundation";
 }
 
-function getGlobalAssessment(production) {
-    if (production.score >= 85) {
-        return "O backend está saudável para beta assistido, desde que monitorado de perto.";
+function getGlobalAssessment({
+    score,
+    blockers
+}) {
+    if (blockers.length > 0) {
+        return (
+            "A arquitetura possui blockers que "
+            + "devem ser corrigidos antes da "
+            + "produção pública."
+        );
     }
 
-    if (production.score >= 70) {
-        return "O backend está próximo de um beta, mas ainda existem pontos de atenção.";
+    if (score >= 90) {
+        return (
+            "A arquitetura está saudável e "
+            + "bem controlada."
+        );
     }
 
-    if (production.score >= 50) {
-        return "O backend precisa de ajustes antes de uso comercial externo.";
+    if (score >= 75) {
+        return (
+            "A arquitetura está funcional, "
+            + "mas ainda existem pontos de "
+            + "limpeza controlada."
+        );
     }
 
-    return "O backend ainda não deve ser colocado em produção.";
+    if (score >= 55) {
+        return (
+            "A arquitetura precisa de ajustes "
+            + "antes da escala."
+        );
+    }
+
+    return (
+        "A arquitetura apresenta risco elevado "
+        + "e não deve ser exposta publicamente."
+    );
 }
 
 function getImmediatePriorities({
     health,
+    architecture,
     technicalDebt,
-    production,
+    moduleHealth,
     roadmap
 }) {
     const priorities = [];
 
-    if (production.blockers.length) {
+    if (
+        architecture.blockers.length > 0
+    ) {
         priorities.push({
-            priority: "critical",
-            title: "Corrigir blockers de produção",
-            reason: "Existem itens bloqueando a segurança operacional.",
-            action: "Resolver todos os blockers antes de avançar."
+            priority:
+                "critical",
+
+            title:
+                "Corrigir blockers arquiteturais",
+
+            reason:
+                "Existem módulos ou arquivos classificados como críticos.",
+
+            action:
+                "Ler os arquivos-fonte antes de iniciar qualquer divisão."
         });
     }
 
-    if (!health.runtime.runtime.status.connected) {
+    if (
+        toNumber(
+            technicalDebt
+                .summary
+                .critical
+        ) > 0
+    ) {
         priorities.push({
-            priority: "high",
-            title: "Estabilizar conexão WhatsApp",
-            reason: "O WhatsApp é o núcleo operacional atual.",
-            action: "Verificar QR, sessão, socket e AutoStart."
+            priority:
+                "critical",
+
+            title:
+                "Reduzir débito técnico crítico",
+
+            reason:
+                "Débitos críticos podem impedir evolução segura.",
+
+            action:
+                "Selecionar um único débito crítico e corrigi-lo com teste mecânico."
         });
     }
 
-    if (technicalDebt.summary.critical > 0 || technicalDebt.summary.high > 0) {
+    if (
+        toNumber(
+            moduleHealth
+                .summary
+                .highRisk
+        ) > 0
+    ) {
         priorities.push({
-            priority: "high",
-            title: "Reduzir débito técnico alto",
-            reason: "Débitos altos podem dificultar escala.",
-            action: "Revisar arquivos e módulos marcados no Technical Debt."
+            priority:
+                "high",
+
+            title:
+                "Revisar módulos de alto risco",
+
+            reason:
+                "Esses módulos concentram linhas, imports ou responsabilidades.",
+
+            action:
+                "Revisar os maiores arquivos antes de adicionar novas funcionalidades."
+        });
+    }
+
+    if (health.logErrors > 0) {
+        priorities.push({
+            priority:
+                "high",
+
+            title:
+                "Revisar erros recentes",
+
+            reason:
+                "Existem erros recentes no runtime.",
+
+            action:
+                "Analisar os logs antes de alterações estruturais."
         });
     }
 
     if (roadmap.nextStep) {
         priorities.push({
-            priority: "medium",
-            title: `Executar próxima etapa: ${roadmap.nextStep.module}`,
-            reason: "Essa é a próxima etapa lógica do roadmap.",
-            action: `Avançar no módulo ${roadmap.nextStep.module}.`
+            priority:
+                "medium",
+
+            title:
+                `Próxima etapa: ${roadmap.nextStep.module}`,
+
+            reason:
+                "Essa é a próxima etapa declarada pelo roadmap atual.",
+
+            action:
+                `Validar a arquitetura antes de avançar para ${roadmap.nextStep.module}.`
         });
     }
 
     if (!priorities.length) {
         priorities.push({
-            priority: "info",
-            title: "Manter evolução planejada",
-            reason: "Nenhum risco imediato crítico encontrado.",
-            action: "Seguir para frontend Lovable e preparação de produção."
+            priority:
+                "info",
+
+            title:
+                "Manter evolução planejada",
+
+            reason:
+                "Nenhum risco arquitetural imediato foi encontrado.",
+
+            action:
+                "Continuar monitorando crescimento e acoplamento."
         });
     }
 
     return priorities;
 }
 
-function canMoveForward(production) {
-    return {
-        betaAssisted: production.score >= 85 && production.blockers.length === 0,
-        productionSmallScale: production.score >= 80 && production.blockers.length === 0,
-        productionLargeScale: false,
-        reason: production.score >= 85
-            ? "Pode avançar para beta assistido."
-            : "Ainda existem warnings ou blockers relevantes."
-    };
-}
-
-function getProductionOpinion(production) {
-    if (production.blockers.length > 0) {
-        return "Não recomendo produção enquanto existirem blockers.";
+function getProductionOpinion(
+    readiness
+) {
+    if (
+        readiness
+            .productionLargeScale
+    ) {
+        return (
+            "A arquitetura está preparada para "
+            + "iniciar planejamento de escala, "
+            + "mas ainda depende de segurança, "
+            + "infraestrutura e testes funcionais."
+        );
     }
 
-    if (production.score >= 85) {
-        return "Recomendo beta assistido com poucos clientes e monitoramento ativo.";
+    if (
+        readiness
+            .productionSmallScale
+    ) {
+        return (
+            "A arquitetura suporta produção de "
+            + "pequena escala com monitoramento."
+        );
     }
 
-    if (production.score >= 70) {
-        return "Recomendo finalizar Lovable, autenticação e checagens antes do beta.";
+    if (
+        readiness
+            .betaAssisted
+    ) {
+        return (
+            "A arquitetura suporta beta assistido, "
+            + "desde que os outros relatórios também "
+            + "estejam aprovados."
+        );
     }
 
-    return "Ainda não recomendo produção.";
+    return (
+        "A arquitetura ainda precisa de ajustes "
+        + "antes da produção."
+    );
 }
 
 function getScalingOpinion({
     technicalDebt,
-    production
+    moduleHealth
 }) {
-    if (technicalDebt.summary.high > 0 || technicalDebt.summary.critical > 0) {
-        return "Antes de escalar, reduza débitos técnicos altos e prepare PostgreSQL, Redis e BullMQ.";
+    const criticalDebts =
+        toNumber(
+            technicalDebt
+                .summary
+                .critical
+        );
+
+    const highDebts =
+        toNumber(
+            technicalDebt
+                .summary
+                .high
+        );
+
+    const criticalModules =
+        toNumber(
+            moduleHealth
+                .summary
+                .criticalRisk
+        );
+
+    const highModules =
+        toNumber(
+            moduleHealth
+                .summary
+                .highRisk
+        );
+
+    if (
+        criticalDebts > 0
+        || criticalModules > 0
+    ) {
+        return (
+            "Antes da escala, corrigir débitos "
+            + "e módulos críticos."
+        );
     }
 
-    if (production.score >= 85) {
-        return "A base está saudável para pilotos, mas 100 empresas exigem PostgreSQL, Redis, BullMQ, Docker e workers separados.";
+    if (
+        highDebts > 0
+        || highModules > 0
+    ) {
+        return (
+            "Redis/BullMQ e Docker podem evoluir, "
+            + "mas os riscos altos devem ser "
+            + "reduzidos antes da VPS pública."
+        );
     }
 
-    return "Ainda não é momento de pensar em 100 empresas. Consolidar beta primeiro.";
+    return (
+        "A arquitetura está controlada para "
+        + "continuar a evolução de infraestrutura."
+    );
 }
 
-function getRecommendedNextModule(roadmap) {
+function getRecommendedNextModule(
+    roadmap
+) {
     if (!roadmap.nextStep) {
         return {
-            module: null,
-            reason: "Roadmap concluído."
+            module:
+                null,
+
+            priority:
+                null,
+
+            reason:
+                "Roadmap concluído."
         };
     }
 
     return {
-        module: roadmap.nextStep.module,
-        priority: roadmap.nextStep.priority,
-        reason: "Este é o próximo módulo pendente conforme prioridade estratégica."
+        module:
+            roadmap
+                .nextStep
+                .module,
+
+        priority:
+            roadmap
+                .nextStep
+                .priority,
+
+        reason:
+            "Próxima etapa pendente conforme o roadmap atual."
     };
 }
 
-function getWarnings({
+function buildBlockers({
+    architecture,
+    technicalDebt,
+    moduleHealth
+}) {
+    const blockers = [];
+
+    blockers.push(
+        ...architecture.blockers.map(
+            (item) =>
+                `Architecture: ${
+                    formatReportItem(item)
+                }`
+        )
+    );
+
+    blockers.push(
+        ...technicalDebt.blockers.map(
+            (item) =>
+                `Technical Debt: ${
+                    formatReportItem(item)
+                }`
+        )
+    );
+
+    blockers.push(
+        ...moduleHealth.blockers.map(
+            (item) =>
+                `Module Health: ${
+                    formatReportItem(item)
+                }`
+        )
+    );
+
+    return uniqueStrings(
+        blockers
+    );
+}
+
+function buildWarnings({
     health,
     architecture,
     technicalDebt,
-    production
+    moduleHealth
 }) {
     const warnings = [];
 
-    if (production.warnings.length > 0) {
-        warnings.push(`${production.warnings.length} warning(s) de produção encontrados.`);
+    warnings.push(
+        ...architecture.warnings
+    );
+
+    warnings.push(
+        ...technicalDebt.warnings
+    );
+
+    warnings.push(
+        ...moduleHealth.warnings
+    );
+
+    if (health.logErrors > 0) {
+        warnings.push(
+            `${health.logErrors} erro(s) recente(s) nos logs.`
+        );
     }
 
-    if (architecture.largeFiles.length > 0) {
-        warnings.push(`${architecture.largeFiles.length} arquivo(s) grande(s) encontrados.`);
+    if (health.logWarnings > 0) {
+        warnings.push(
+            `${health.logWarnings} warning(s) recente(s) nos logs.`
+        );
     }
 
-    if (technicalDebt.summary.total > 0) {
-        warnings.push(`${technicalDebt.summary.total} débito(s) técnico(s) encontrados.`);
+    return uniqueStrings(
+        warnings
+    );
+}
+
+function buildRecommendations({
+    architecture,
+    technicalDebt,
+    moduleHealth
+}) {
+    return uniqueStrings([
+        ...architecture.recommendations,
+        ...technicalDebt.recommendations,
+        ...moduleHealth.recommendations,
+
+        "Realizar alterações estruturais em pequenos pacotes.",
+
+        "Executar testes mecânicos após cada refatoração."
+    ]);
+}
+
+function buildNextSteps({
+    blockers,
+    roadmap,
+    architecture
+}) {
+    const steps = [];
+
+    if (blockers.length > 0) {
+        steps.push(
+            "Corrigir o primeiro blocker arquitetural."
+        );
     }
 
-    if (health.logs.summary.errors > 0) {
-        warnings.push(`${health.logs.summary.errors} erro(s) recente(s) nos logs.`);
+    steps.push(
+        ...architecture.nextSteps
+    );
+
+    if (roadmap.nextStep) {
+        steps.push(
+            `Validar arquitetura antes de iniciar ${roadmap.nextStep.module}.`
+        );
     }
 
-    if (!warnings.length) {
-        warnings.push("Nenhum alerta estratégico relevante no momento.");
-    }
+    return uniqueStrings(
+        steps
+    );
+}
 
-    return warnings;
+function normalizeHealth(
+    health
+) {
+    const source =
+        safeObject(
+            health
+        );
+
+    const runtimeReview =
+        safeObject(
+            source.runtime
+        );
+
+    const runtime =
+        safeObject(
+            runtimeReview.runtime
+        );
+
+    const runtimeStatus =
+        safeObject(
+            runtime.status
+        );
+
+    const logs =
+        safeObject(
+            source.logs
+        );
+
+    const logSummary =
+        safeObject(
+            logs.summary
+        );
+
+    return {
+        whatsappConnected:
+            Boolean(
+                runtimeStatus.connected
+            ),
+
+        logErrors:
+            toNumber(
+                logSummary.errors
+            ),
+
+        logWarnings:
+            toNumber(
+                logSummary.warnings
+            )
+    };
+}
+
+function normalizeTechnicalDebt(
+    technicalDebt
+) {
+    const report =
+        normalizeReport(
+            technicalDebt,
+            {
+                type:
+                    "technical_debt_report"
+            }
+        );
+
+    const summary =
+        safeObject(
+            report.summary
+        );
+
+    return {
+        ...report,
+
+        summary: {
+            total:
+                toNumber(
+                    summary.total
+                ),
+
+            critical:
+                toNumber(
+                    summary.critical
+                ),
+
+            high:
+                toNumber(
+                    summary.high
+                ),
+
+            medium:
+                toNumber(
+                    summary.medium
+                ),
+
+            low:
+                toNumber(
+                    summary.low
+                ),
+
+            estimatedHours:
+                toNumber(
+                    summary.estimatedHours
+                )
+        },
+
+        debts:
+            toArray(
+                technicalDebt
+                    ?.debts
+            )
+    };
+}
+
+function normalizeRoadmap(
+    roadmap
+) {
+    const source =
+        safeObject(
+            roadmap
+        );
+
+    return {
+        progress:
+            toNumber(
+                source.progress
+            ),
+
+        completed:
+            toNumber(
+                source.completed
+            ),
+
+        pending:
+            toNumber(
+                source.pending
+            ),
+
+        nextStep:
+            source.nextStep
+            || null,
+
+        roadmap:
+            toArray(
+                source.roadmap
+            )
+    };
 }

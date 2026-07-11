@@ -1,4 +1,6 @@
-import { Router } from "express";
+import {
+    Router
+} from "express";
 
 import {
     status,
@@ -59,78 +61,383 @@ import {
     clearKnowledgeBase
 } from "../controllers/ai-monitor.controller.js";
 
-const router = Router();
+const router =
+    Router();
 
-router.get("/status", status);
-router.get("/runtime-review", runtimeReview);
-router.get("/queue-review", queueReview);
-router.get("/log-review", logReview);
-router.get("/full-review", fullReview);
-router.get("/executive-report", executiveReport);
-router.get("/code-inventory", codeInventory);
-router.get("/architecture-review", architectureReview);
-router.get("/dependency-graph", dependencyGraph);
-router.get("/technical-debt", technicalDebt);
-router.get("/production-readiness", productionReadiness);
-router.get("/api-map", apiMap);
-router.get("/lovable-api-guide", lovableApiGuide);
+/*
+|--------------------------------------------------------------------------
+| Runtime e saúde operacional
+|--------------------------------------------------------------------------
+*/
 
-router.get("/roadmap", roadmap);
-router.get("/roadmap-dashboard", roadmapDashboard);
+router.get(
+    "/status",
+    status
+);
 
-router.get("/architecture-advisor", architectureAdvisor);
-router.get("/architecture-advisor-dashboard", architectureAdvisorDashboard);
+router.get(
+    "/runtime-review",
+    runtimeReview
+);
 
-router.post("/advisor-chat", advisorChat);
-router.post("/advisor-prompt", advisorPrompt);
-router.get("/advisor-chat/history", advisorChatHistory);
-router.post("/advisor-chat/clear", clearAdvisorChat);
-router.get("/advisor-chat-dashboard", advisorChatDashboard);
+router.get(
+    "/queue-review",
+    queueReview
+);
 
-router.post("/external-ai/advisor", externalAiAdvisor);
-router.get("/external-ai/status", externalAiStatus);
-router.post("/external-ai/configure", externalAiConfigure);
-router.get("/external-ai/dashboard", externalAiDashboard);
+router.get(
+    "/log-review",
+    logReview
+);
 
-router.post("/continuous/snapshot", continuousSnapshot);
-router.get("/continuous/history", continuousHistory);
+router.get(
+    "/full-review",
+    fullReview
+);
 
-router.get("/project-memory", projectMemory);
-router.post("/project-memory", createProjectMemory);
-router.post("/project-memory/seed", seedProjectMemory);
-router.post("/project-memory/clear", clearProjectMemory);
+router.get(
+    "/executive-report",
+    executiveReport
+);
 
-router.get("/scanner", scanner);
-router.get("/scanner-dashboard", scannerDashboard);
-router.post("/scanner/scan-src", scanSource);
-router.post("/scanner/register", registerScannerFile);
-router.post("/scanner/clear", clearScannerData);
+/*
+|--------------------------------------------------------------------------
+| Arquitetura e código
+|--------------------------------------------------------------------------
+*/
 
-router.get("/module-health", moduleHealth);
-router.get("/module-health-dashboard", moduleHealthDashboard);
+router.get(
+    "/code-inventory",
+    codeInventory
+);
 
-router.get("/security-scan", securityScan);
-router.get("/security-routes", securityRoutes);
-router.get("/security-config", securityConfig);
-router.get("/security-report", securityReport);
-router.get("/security-dashboard", securityDashboard);
+router.get(
+    "/architecture-review",
+    architectureReview
+);
 
-router.get("/performance-scan", performanceScan);
-router.get("/performance-report", performanceReport);
-router.get("/performance-dashboard", performanceDashboard);
+router.get(
+    "/dependency-graph",
+    dependencyGraph
+);
 
-router.get("/refactoring-advisor", refactoringAdvisor);
-router.get("/refactoring-dashboard", refactoringDashboard);
+router.get(
+    "/technical-debt",
+    technicalDebt
+);
 
-router.get("/release-advisor", releaseAdvisor);
-router.get("/release-dashboard", releaseDashboard);
+router.get(
+    "/production-readiness",
+    productionReadiness
+);
 
-router.get("/final-overview", finalOverview);
-router.get("/final-overview-dashboard", finalOverviewDashboard);
+router.get(
+    "/api-map",
+    apiMap
+);
 
-router.get("/dashboard", dashboard);
+router.get(
+    "/lovable-api-guide",
+    lovableApiGuide
+);
 
-router.get("/knowledge", knowledge);
-router.post("/knowledge/clear", clearKnowledgeBase);
+/*
+|--------------------------------------------------------------------------
+| Roadmap
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/roadmap",
+    roadmap
+);
+
+router.get(
+    "/roadmap-dashboard",
+    roadmapDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Architecture Advisor
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/architecture-advisor",
+    architectureAdvisor
+);
+
+router.get(
+    "/architecture-advisor-dashboard",
+    architectureAdvisorDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| AI Advisor
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+    "/advisor-chat",
+    advisorChat
+);
+
+router.post(
+    "/advisor-prompt",
+    advisorPrompt
+);
+
+router.get(
+    "/advisor-chat/history",
+    advisorChatHistory
+);
+
+router.post(
+    "/advisor-chat/clear",
+    clearAdvisorChat
+);
+
+router.get(
+    "/advisor-chat-dashboard",
+    advisorChatDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| IA externa
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+    "/external-ai/advisor",
+    externalAiAdvisor
+);
+
+router.get(
+    "/external-ai/status",
+    externalAiStatus
+);
+
+router.post(
+    "/external-ai/configure",
+    externalAiConfigure
+);
+
+router.get(
+    "/external-ai/dashboard",
+    externalAiDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Análise contínua
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+    "/continuous/snapshot",
+    continuousSnapshot
+);
+
+router.get(
+    "/continuous/history",
+    continuousHistory
+);
+
+/*
+|--------------------------------------------------------------------------
+| Memória do projeto
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/project-memory",
+    projectMemory
+);
+
+router.post(
+    "/project-memory",
+    createProjectMemory
+);
+
+router.post(
+    "/project-memory/seed",
+    seedProjectMemory
+);
+
+router.post(
+    "/project-memory/clear",
+    clearProjectMemory
+);
+
+/*
+|--------------------------------------------------------------------------
+| Scanner
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/scanner",
+    scanner
+);
+
+router.get(
+    "/scanner-dashboard",
+    scannerDashboard
+);
+
+router.post(
+    "/scanner/scan-src",
+    scanSource
+);
+
+router.post(
+    "/scanner/register",
+    registerScannerFile
+);
+
+router.post(
+    "/scanner/clear",
+    clearScannerData
+);
+
+/*
+|--------------------------------------------------------------------------
+| Module Health
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/module-health",
+    moduleHealth
+);
+
+router.get(
+    "/module-health-dashboard",
+    moduleHealthDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Security
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/security-scan",
+    securityScan
+);
+
+router.get(
+    "/security-routes",
+    securityRoutes
+);
+
+router.get(
+    "/security-config",
+    securityConfig
+);
+
+router.get(
+    "/security-report",
+    securityReport
+);
+
+router.get(
+    "/security-dashboard",
+    securityDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Performance
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/performance-scan",
+    performanceScan
+);
+
+router.get(
+    "/performance-report",
+    performanceReport
+);
+
+router.get(
+    "/performance-dashboard",
+    performanceDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Refactoring Advisor
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/refactoring-advisor",
+    refactoringAdvisor
+);
+
+router.get(
+    "/refactoring-dashboard",
+    refactoringDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Release Advisor
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/release-advisor",
+    releaseAdvisor
+);
+
+router.get(
+    "/release-dashboard",
+    releaseDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Final Overview
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/final-overview",
+    finalOverview
+);
+
+router.get(
+    "/final-overview-dashboard",
+    finalOverviewDashboard
+);
+
+/*
+|--------------------------------------------------------------------------
+| Dashboards e conhecimento
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/dashboard",
+    dashboard
+);
+
+router.get(
+    "/knowledge",
+    knowledge
+);
+
+router.post(
+    "/knowledge/clear",
+    clearKnowledgeBase
+);
 
 export default router;

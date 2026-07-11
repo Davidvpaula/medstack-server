@@ -1,11 +1,20 @@
 import { AppError } from "../../../core/errors/AppError.js";
 
-import { companyRepository } from "../../company/repositories/company.repository.js";
-import { contactRepository } from "../../contact/repositories/contact.repository.js";
-import { conversationRepository } from "../../conversation/repositories/conversation.repository.js";
+import {
+    companyPostgresRepository
+} from "../../../database/repositories/company.postgres.repository.js";
 
-import { Message } from "../entities/message.entity.js";
-import { messageRepository } from "../repositories/message.repository.js";
+import {
+    contactPostgresRepository
+} from "../../../database/repositories/contact.postgres.repository.js";
+
+import {
+    conversationPostgresRepository
+} from "../../../database/repositories/conversation.postgres.repository.js";
+
+import {
+    messagePostgresRepository
+} from "../../../database/repositories/message.postgres.repository.js";
 
 import {
     MESSAGE_DIRECTION,
@@ -17,40 +26,44 @@ import {
 export function getMessageStatus() {
     return {
         module: "message",
-        status: "active"
+        status: "active",
+        persistence: "postgres"
     };
 }
 
-export function listMessages() {
-    return messageRepository.list();
+export async function listMessages() {
+    return messagePostgresRepository.listMessages();
 }
 
-export function listMessagesByCompany(companyId) {
-    ensureCompanyExists(companyId);
+export async function listMessagesByCompany(companyId) {
+    await ensureCompanyExists(companyId);
 
-    return messageRepository.listByCompany(companyId);
+    return messagePostgresRepository.listMessagesByCompany(companyId);
 }
 
-export function listMessagesByConversation(conversationId) {
-    ensureConversationExists(conversationId);
+export async function listMessagesByConversation(conversationId) {
+    const conversation = await ensureConversationExists(conversationId);
 
-    return messageRepository.listByConversation(conversationId);
+    return messagePostgresRepository.listMessagesByConversation(
+        conversation.companyId,
+        conversation.id
+    );
 }
 
-export function listMessagesByContact(contactId) {
-    ensureContactExists(contactId);
+export async function listMessagesByContact(contactId) {
+    await ensureContactExists(contactId);
 
-    return messageRepository.listByContact(contactId);
+    return messagePostgresRepository.listMessagesByContact(contactId);
 }
 
-export function getMessageById(messageId) {
-    const message = messageRepository.findById(messageId);
+export async function getMessageById(messageId) {
+    const message = await messagePostgresRepository.findMessageById(messageId);
 
     if (!message) {
         throw new AppError("Mensagem não encontrada.", 404);
     }
 
-    return message;
+    return normalizeMessageOutput(message);
 }
 
 export async function createMessage(data) {
@@ -66,9 +79,9 @@ export async function createMessage(data) {
         throw new AppError("Informe contactId.", 400);
     }
 
-    const company = ensureCompanyExists(data.companyId);
-    const conversation = ensureConversationExists(data.conversationId);
-    const contact = ensureContactExists(data.contactId);
+    const company = await ensureCompanyExists(data.companyId);
+    const conversation = await ensureConversationExists(data.conversationId);
+    const contact = await ensureContactExists(data.contactId);
 
     if (conversation.companyId !== company.id) {
         throw new AppError("Conversa não pertence a esta empresa.", 403);
@@ -78,52 +91,55 @@ export async function createMessage(data) {
         throw new AppError("Contato não pertence a esta empresa.", 403);
     }
 
-    const message = new Message({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    const direction = data.direction || MESSAGE_DIRECTION.INBOUND;
+    const status = data.status || MESSAGE_STATUS.PENDING;
+    const type = data.type || MESSAGE_TYPE.TEXT;
+
+    const message = await messagePostgresRepository.createMessage({
         companyId: company.id,
         conversationId: conversation.id,
         contactId: contact.id,
-        direction: data.direction || MESSAGE_DIRECTION.INBOUND,
-        type: data.type || MESSAGE_TYPE.TEXT,
-        status: data.status || MESSAGE_STATUS.PENDING,
-        senderType: data.senderType || MESSAGE_SENDER_TYPE.CONTACT,
-        senderId: data.senderId || null,
-        text: data.text || "",
-        media: data.media || {},
-        metadata: data.metadata || {},
-        externalId: data.externalId || null
+        whatsappInstanceId: data.whatsappInstanceId || conversation.whatsappInstanceId || null,
+        externalId: data.externalId || null,
+        direction,
+        type,
+        content: data.content || data.text || "",
+        status,
+        provider: data.provider || "baileys",
+        metadata: {
+            senderType: data.senderType || MESSAGE_SENDER_TYPE.CONTACT,
+            senderId: data.senderId || null,
+            text: data.text || data.content || "",
+            media: data.media || {},
+            ...(data.metadata || {})
+        }
     });
 
-    const savedMessage = messageRepository.create(message);
+    await conversationPostgresRepository.markLastMessage(conversation.id);
 
-    if (savedMessage.direction === MESSAGE_DIRECTION.INBOUND) {
-        conversation.markInbound(savedMessage);
-    }
-
-    if (savedMessage.direction === MESSAGE_DIRECTION.OUTBOUND) {
-        conversation.markOutbound(savedMessage);
-    }
-
-    company.updateStatistics({
-        totalMessages: (company.statistics.totalMessages || 0) + 1,
-        monthlyMessages: (company.statistics.monthlyMessages || 0) + 1
-    });
-
-    contact.markActivity();
-
-    return savedMessage;
+    return normalizeMessageOutput(message);
 }
 
 export async function updateMessage(messageId, data) {
-    getMessageById(messageId);
+    await getMessageById(messageId);
 
-    return messageRepository.update(messageId, data);
+    const updated = await messagePostgresRepository.updateMessage(messageId, {
+        ...data,
+        content: data.content || data.text,
+        metadata: {
+            ...(data.metadata || {}),
+            text: data.text || data.content,
+            media: data.media
+        }
+    });
+
+    return normalizeMessageOutput(updated);
 }
 
 export async function deleteMessage(messageId) {
-    getMessageById(messageId);
+    await getMessageById(messageId);
 
-    messageRepository.remove(messageId);
+    await messagePostgresRepository.softDeleteMessage(messageId);
 
     return {
         deleted: true,
@@ -132,39 +148,39 @@ export async function deleteMessage(messageId) {
 }
 
 export async function markMessageSent(messageId) {
-    const message = getMessageById(messageId);
+    await getMessageById(messageId);
 
-    message.markSent();
+    const message = await messagePostgresRepository.markSent(messageId);
 
-    return message;
+    return normalizeMessageOutput(message);
 }
 
 export async function markMessageDelivered(messageId) {
-    const message = getMessageById(messageId);
+    await getMessageById(messageId);
 
-    message.markDelivered();
+    const message = await messagePostgresRepository.markDelivered(messageId);
 
-    return message;
+    return normalizeMessageOutput(message);
 }
 
 export async function markMessageRead(messageId) {
-    const message = getMessageById(messageId);
+    await getMessageById(messageId);
 
-    message.markRead();
+    const message = await messagePostgresRepository.markRead(messageId);
 
-    return message;
+    return normalizeMessageOutput(message);
 }
 
 export async function markMessageFailed(messageId, error) {
-    const message = getMessageById(messageId);
+    await getMessageById(messageId);
 
-    message.markFailed(error);
+    const message = await messagePostgresRepository.markFailed(messageId, error);
 
-    return message;
+    return normalizeMessageOutput(message);
 }
 
-function ensureCompanyExists(companyId) {
-    const company = companyRepository.findById(companyId);
+async function ensureCompanyExists(companyId) {
+    const company = await companyPostgresRepository.findCompanyById(companyId);
 
     if (!company) {
         throw new AppError("Empresa não encontrada.", 404);
@@ -173,8 +189,10 @@ function ensureCompanyExists(companyId) {
     return company;
 }
 
-function ensureConversationExists(conversationId) {
-    const conversation = conversationRepository.findById(conversationId);
+async function ensureConversationExists(conversationId) {
+    const conversation = await conversationPostgresRepository.findConversationById(
+        conversationId
+    );
 
     if (!conversation) {
         throw new AppError("Conversa não encontrada.", 404);
@@ -183,12 +201,26 @@ function ensureConversationExists(conversationId) {
     return conversation;
 }
 
-function ensureContactExists(contactId) {
-    const contact = contactRepository.findById(contactId);
+async function ensureContactExists(contactId) {
+    const contact = await contactPostgresRepository.findContactById(contactId);
 
     if (!contact) {
         throw new AppError("Contato não encontrado.", 404);
     }
 
     return contact;
+}
+
+function normalizeMessageOutput(message) {
+    if (!message) {
+        return null;
+    }
+
+    return {
+        ...message,
+        text: message.metadata?.text || message.content || "",
+        media: message.metadata?.media || {},
+        senderType: message.metadata?.senderType || null,
+        senderId: message.metadata?.senderId || null
+    };
 }

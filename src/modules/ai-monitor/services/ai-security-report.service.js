@@ -10,44 +10,175 @@ import {
     getSecurityConfigChecklist
 } from "./ai-security-config-checklist.service.js";
 
+import {
+    clampScore,
+    createReport,
+    safeObject,
+    toArray,
+    toNumber,
+    uniqueStrings
+} from "./ai-report-utils.service.js";
+
 export function getSecurityFinalReport() {
-    const scan = getSecurityScanReport();
-    const routes = getSecurityRouteAnalysis();
-    const config = getSecurityConfigChecklist();
+    const scan =
+        normalizeScan(
+            getSecurityScanReport()
+        );
 
-    const score = calculateSecurityScore(scan, routes, config);
+    const routes =
+        normalizeRoutes(
+            getSecurityRouteAnalysis()
+        );
 
-    return {
-        type: "security_final_report",
-        generatedAt: new Date().toISOString(),
-        score,
-        status: getSecurityStatus(score),
-        scan,
-        routes,
-        config,
-        blockers: getSecurityBlockers(scan, routes, config),
-        recommendations: getFinalRecommendations(score, scan, routes, config)
+    const config =
+        normalizeConfig(
+            getSecurityConfigChecklist()
+        );
+
+    const score =
+        calculateSecurityScore({
+            scan,
+            routes,
+            config
+        });
+
+    const blockers =
+        getSecurityBlockers({
+            scan,
+            routes,
+            config
+        });
+
+    const warnings =
+        getSecurityWarnings({
+            scan,
+            routes,
+            config
+        });
+
+    const recommendations =
+        getSecurityRecommendations({
+            score,
+            scan,
+            routes,
+            config
+        });
+
+    const nextSteps =
+        getSecurityNextSteps({
+            blockers,
+            config
+        });
+
+    const summary = {
+        totalFindings:
+            scan.summary.totalFindings,
+
+        criticalFindings:
+            scan.summary.critical,
+
+        highFindings:
+            scan.summary.high,
+
+        mediumFindings:
+            scan.summary.medium,
+
+        lowFindings:
+            scan.summary.low,
+
+        totalRoutes:
+            routes.summary.totalRoutes,
+
+        riskyRoutes:
+            routes.summary.riskyRoutes,
+
+        criticalRoutes:
+            routes.summary.critical,
+
+        highRoutes:
+            routes.summary.high,
+
+        mediumRoutes:
+            routes.summary.medium,
+
+        checklistTotal:
+            config.summary.total,
+
+        checklistPassed:
+            config.summary.passed,
+
+        checklistPartial:
+            config.summary.partial,
+
+        checklistPending:
+            config.summary.pending,
+
+        checklistUnknown:
+            config.summary.unknown,
+
+        scannerScore:
+            scan.score,
+
+        routesScore:
+            routes.score,
+
+        configScore:
+            config.score
     };
+
+    return createReport({
+        type:
+            "security_final_report",
+
+        score,
+
+        status:
+            getSecurityStatus(
+                score,
+                blockers
+            ),
+
+        summary,
+
+        blockers,
+
+        warnings,
+
+        recommendations,
+
+        nextSteps,
+
+        data: {
+            scan,
+            routes,
+            config
+        }
+    });
 }
 
-function calculateSecurityScore(scan, routes, config) {
-    let score = 100;
+function calculateSecurityScore({
+    scan,
+    routes,
+    config
+}) {
+    const weightedScore =
+        scan.score * 0.35
+        + routes.score * 0.35
+        + config.score * 0.30;
 
-    score -= scan.summary.critical * 20;
-    score -= scan.summary.high * 12;
-    score -= scan.summary.medium * 6;
-
-    score -= routes.summary.critical * 15;
-    score -= routes.summary.high * 10;
-    score -= routes.summary.medium * 4;
-
-    score -= config.summary.pending * 5;
-    score -= config.summary.partial * 2;
-
-    return Math.max(score, 0);
+    return clampScore(
+        weightedScore
+    );
 }
 
-function getSecurityStatus(score) {
+function getSecurityStatus(
+    score,
+    blockers
+) {
+    if (blockers.length > 0) {
+        return "not_secure_for_production";
+    }
+
     if (score >= 90) {
         return "secure_for_beta";
     }
@@ -63,41 +194,341 @@ function getSecurityStatus(score) {
     return "not_secure_for_production";
 }
 
-function getSecurityBlockers(scan, routes, config) {
+function getSecurityBlockers({
+    scan,
+    routes,
+    config
+}) {
     const blockers = [];
 
-    if (scan.summary.critical > 0) {
-        blockers.push("Existem achados críticos no scanner de segurança.");
+    blockers.push(
+        ...scan.blockers
+    );
+
+    blockers.push(
+        ...routes.blockers.map(
+            (item) =>
+                `Route: ${item}`
+        )
+    );
+
+    if (
+        config.summary.pending > 4
+    ) {
+        blockers.push(
+            "Muitos controles fundamentais de segurança ainda estão pendentes."
+        );
     }
 
-    if (routes.summary.critical > 0) {
-        blockers.push("Existem rotas críticas que precisam de proteção.");
-    }
-
-    if (config.summary.pending > 4) {
-        blockers.push("Muitos itens essenciais de segurança ainda estão pendentes.");
-    }
-
-    if (!blockers.length) {
-        blockers.push("Nenhum blocker crítico de segurança identificado pelo scanner atual.");
-    }
-
-    return blockers;
+    return uniqueStrings(
+        blockers
+    );
 }
 
-function getFinalRecommendations(score) {
+function getSecurityWarnings({
+    scan,
+    routes,
+    config
+}) {
+    const warnings = [];
+
+    warnings.push(
+        ...scan.warnings
+    );
+
+    warnings.push(
+        ...routes.warnings
+    );
+
+    warnings.push(
+        ...config.warnings
+    );
+
+    return uniqueStrings(
+        warnings
+    );
+}
+
+function getSecurityRecommendations({
+    score,
+    scan,
+    routes,
+    config
+}) {
     const recommendations = [];
 
     if (score < 75) {
-        recommendations.push("Não expor backend publicamente antes de corrigir segurança básica.");
+        recommendations.push(
+            "Não expor o backend publicamente antes de corrigir os principais controles de segurança."
+        );
     }
 
-    recommendations.push("Implementar Helmet.");
-    recommendations.push("Implementar CORS restrito.");
-    recommendations.push("Implementar rate limit.");
-    recommendations.push("Proteger dashboards técnicos com autenticação e RBAC.");
-    recommendations.push("Adicionar audit logs para clear, restart, configure, delete e dispatch.");
-    recommendations.push("Antes da VPS pública, revisar secrets e variáveis de ambiente.");
+    recommendations.push(
+        ...scan.recommendations,
+        ...routes.recommendations,
+        ...config.recommendations
+    );
 
-    return recommendations;
+    recommendations.push(
+        "Executar testes manuais de autenticação, autorização e isolamento entre empresas."
+    );
+
+    return uniqueStrings(
+        recommendations
+    );
+}
+
+function getSecurityNextSteps({
+    blockers,
+    config
+}) {
+    const steps = [];
+
+    if (blockers.length > 0) {
+        steps.push(
+            "Corrigir os blockers antes da VPS pública."
+        );
+    }
+
+    steps.push(
+        ...config.nextSteps
+    );
+
+    steps.push(
+        "Executar novamente Security Scanner e Route Analyzer."
+    );
+
+    return uniqueStrings(
+        steps
+    );
+}
+
+function normalizeScan(scan) {
+    const source =
+        safeObject(scan);
+
+    const summary =
+        safeObject(
+            source.summary
+        );
+
+    return {
+        ...source,
+
+        score:
+            toNumber(
+                source.score
+            ),
+
+        status:
+            source.status
+            || "unknown",
+
+        summary: {
+            totalFindings:
+                toNumber(
+                    summary.totalFindings
+                ),
+
+            critical:
+                toNumber(
+                    summary.critical
+                ),
+
+            high:
+                toNumber(
+                    summary.high
+                ),
+
+            medium:
+                toNumber(
+                    summary.medium
+                ),
+
+            low:
+                toNumber(
+                    summary.low
+                )
+        },
+
+        findings:
+            toArray(
+                source.findings
+            ),
+
+        blockers:
+            toArray(
+                source.blockers
+            ),
+
+        warnings:
+            toArray(
+                source.warnings
+            ),
+
+        recommendations:
+            toArray(
+                source.recommendations
+            ),
+
+        nextSteps:
+            toArray(
+                source.nextSteps
+            )
+    };
+}
+
+function normalizeRoutes(routes) {
+    const source =
+        safeObject(routes);
+
+    const summary =
+        safeObject(
+            source.summary
+        );
+
+    return {
+        ...source,
+
+        score:
+            toNumber(
+                source.score
+            ),
+
+        status:
+            source.status
+            || "unknown",
+
+        summary: {
+            totalRoutes:
+                toNumber(
+                    summary.totalRoutes
+                ),
+
+            riskyRoutes:
+                toNumber(
+                    summary.riskyRoutes
+                ),
+
+            critical:
+                toNumber(
+                    summary.critical
+                ),
+
+            high:
+                toNumber(
+                    summary.high
+                ),
+
+            medium:
+                toNumber(
+                    summary.medium
+                ),
+
+            low:
+                toNumber(
+                    summary.low
+                )
+        },
+
+        riskyRoutes:
+            toArray(
+                source.riskyRoutes
+            ),
+
+        blockers:
+            toArray(
+                source.blockers
+            ),
+
+        warnings:
+            toArray(
+                source.warnings
+            ),
+
+        recommendations:
+            toArray(
+                source.recommendations
+            ),
+
+        nextSteps:
+            toArray(
+                source.nextSteps
+            )
+    };
+}
+
+function normalizeConfig(config) {
+    const source =
+        safeObject(config);
+
+    const summary =
+        safeObject(
+            source.summary
+        );
+
+    return {
+        ...source,
+
+        score:
+            toNumber(
+                source.score
+            ),
+
+        status:
+            source.status
+            || "unknown",
+
+        summary: {
+            total:
+                toNumber(
+                    summary.total
+                ),
+
+            passed:
+                toNumber(
+                    summary.passed
+                ),
+
+            partial:
+                toNumber(
+                    summary.partial
+                ),
+
+            pending:
+                toNumber(
+                    summary.pending
+                ),
+
+            unknown:
+                toNumber(
+                    summary.unknown
+                )
+        },
+
+        checklist:
+            toArray(
+                source.checklist
+            ),
+
+        blockers:
+            toArray(
+                source.blockers
+            ),
+
+        warnings:
+            toArray(
+                source.warnings
+            ),
+
+        recommendations:
+            toArray(
+                source.recommendations
+            ),
+
+        nextSteps:
+            toArray(
+                source.nextSteps
+            )
+    };
 }

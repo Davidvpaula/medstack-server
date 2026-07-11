@@ -3,42 +3,62 @@ import {
 } from "./whatsapp-message-handler.service.js";
 
 import {
-    resolveCompanyIdFromInstance
+    resolveCompanyIdFromInstancePersistent
 } from "./instance-company-resolver.service.js";
+
+import {
+    persistWhatsappRuntimeSafely
+} from "./whatsapp-runtime-persistence.service.js";
 
 import {
     bindPresenceEvents
 } from "./socket-presence.service.js";
 
-export async function bindSocketEvents(socket, instanceId) {
+export async function bindSocketEvents(
+    socket,
+    instanceId
+) {
     if (!socket) {
         return;
     }
 
-    socket.ev.on("messages.upsert", async (event) => {
-        try {
-            const messages = event.messages || [];
+    socket.ev.on(
+        "messages.upsert",
+        async (event) => {
+            try {
+                const messages =
+                    event.messages || [];
 
-            for (const rawMessage of messages) {
-                await processIncomingSocketMessage(
-                    rawMessage,
+                for (const rawMessage of messages) {
+                    await processIncomingSocketMessage(
+                        rawMessage,
+                        instanceId
+                    );
+                }
+
+                persistWhatsappRuntimeSafely(
                     instanceId
                 );
+            } catch (error) {
+                console.error(
+                    "[WhatsApp Socket] Erro ao processar messages.upsert",
+                    error
+                );
             }
-        } catch (error) {
-            console.error(
-                "[WhatsApp Socket] Erro ao processar messages.upsert",
-                error
-            );
         }
-    });
+    );
 
     await bindPresenceEvents(socket);
 
-    console.log("[WhatsApp Socket] Eventos registrados.");
+    console.log(
+        "[WhatsApp Socket] Eventos registrados."
+    );
 }
 
-async function processIncomingSocketMessage(rawMessage, instanceId) {
+async function processIncomingSocketMessage(
+    rawMessage,
+    instanceId
+) {
     if (!rawMessage?.message) {
         return;
     }
@@ -47,7 +67,8 @@ async function processIncomingSocketMessage(rawMessage, instanceId) {
         return;
     }
 
-    const remoteJid = rawMessage.key?.remoteJid || "";
+    const remoteJid =
+        rawMessage.key?.remoteJid || "";
 
     if (isGroupMessage(remoteJid)) {
         return;
@@ -59,13 +80,20 @@ async function processIncomingSocketMessage(rawMessage, instanceId) {
         return;
     }
 
-    const normalizedMessage = normalizeIncomingMessage(rawMessage);
+    const normalizedMessage =
+        normalizeIncomingMessage(rawMessage);
 
-    if (!normalizedMessage.text && normalizedMessage.type === "system") {
+    if (
+        !normalizedMessage.text
+        && normalizedMessage.type === "system"
+    ) {
         return;
     }
 
-    const companyId = resolveCompanyIdFromInstance(instanceId);
+    const companyId =
+        await resolveCompanyIdFromInstancePersistent(
+            instanceId
+        );
 
     await handleIncomingWhatsAppMessage({
         companyId,
@@ -74,33 +102,50 @@ async function processIncomingSocketMessage(rawMessage, instanceId) {
         text: normalizedMessage.text,
         type: normalizedMessage.type,
         media: normalizedMessage.media,
-        externalId: rawMessage.key?.id || null,
+        externalId:
+            rawMessage.key?.id || null,
         provider: "baileys",
         metadata: {
             instanceId,
             remoteJid,
-            participant: rawMessage.key?.participant || null,
-            fromMe: Boolean(rawMessage.key?.fromMe),
-            pushName: rawMessage.pushName || "",
-            timestamp: rawMessage.messageTimestamp || null,
-            messageKey: rawMessage.key || null,
-            rawType: normalizedMessage.rawType,
-            location: normalizedMessage.location || null,
-            contact: normalizedMessage.contact || null
+            participant:
+                rawMessage.key?.participant || null,
+            fromMe:
+                Boolean(rawMessage.key?.fromMe),
+            pushName:
+                rawMessage.pushName || "",
+            timestamp:
+                rawMessage.messageTimestamp || null,
+            messageKey:
+                rawMessage.key || null,
+            rawType:
+                normalizedMessage.rawType,
+            location:
+                normalizedMessage.location || null,
+            contact:
+                normalizedMessage.contact || null
         }
     });
 
-    console.log("[WhatsApp Inbound] Mensagem processada.", {
-        companyId,
-        phone,
-        type: normalizedMessage.type,
-        externalId: rawMessage.key?.id || null
-    });
+    console.log(
+        "[WhatsApp Inbound] Mensagem processada.",
+        {
+            companyId,
+            instanceId,
+            phone,
+            type: normalizedMessage.type,
+            externalId:
+                rawMessage.key?.id || null
+        }
+    );
 }
 
 function normalizeIncomingMessage(rawMessage) {
-    const message = rawMessage.message || {};
-    const rawType = Object.keys(message)[0] || "unknown";
+    const message =
+        rawMessage.message || {};
+
+    const rawType =
+        Object.keys(message)[0] || "unknown";
 
     if (message.conversation) {
         return {
@@ -123,11 +168,14 @@ function normalizeIncomingMessage(rawMessage) {
     if (message.imageMessage) {
         return {
             type: "image",
-            text: message.imageMessage.caption || "",
+            text:
+                message.imageMessage.caption || "",
             media: {
-                mimeType: message.imageMessage.mimetype || "",
+                mimeType:
+                    message.imageMessage.mimetype || "",
                 fileName: "",
-                size: message.imageMessage.fileLength || 0
+                size:
+                    message.imageMessage.fileLength || 0
             },
             rawType
         };
@@ -138,9 +186,11 @@ function normalizeIncomingMessage(rawMessage) {
             type: "audio",
             text: "",
             media: {
-                mimeType: message.audioMessage.mimetype || "",
+                mimeType:
+                    message.audioMessage.mimetype || "",
                 fileName: "",
-                size: message.audioMessage.fileLength || 0
+                size:
+                    message.audioMessage.fileLength || 0
             },
             rawType
         };
@@ -149,11 +199,14 @@ function normalizeIncomingMessage(rawMessage) {
     if (message.videoMessage) {
         return {
             type: "video",
-            text: message.videoMessage.caption || "",
+            text:
+                message.videoMessage.caption || "",
             media: {
-                mimeType: message.videoMessage.mimetype || "",
+                mimeType:
+                    message.videoMessage.mimetype || "",
                 fileName: "",
-                size: message.videoMessage.fileLength || 0
+                size:
+                    message.videoMessage.fileLength || 0
             },
             rawType
         };
@@ -162,11 +215,15 @@ function normalizeIncomingMessage(rawMessage) {
     if (message.documentMessage) {
         return {
             type: "document",
-            text: message.documentMessage.caption || "",
+            text:
+                message.documentMessage.caption || "",
             media: {
-                mimeType: message.documentMessage.mimetype || "",
-                fileName: message.documentMessage.fileName || "",
-                size: message.documentMessage.fileLength || 0
+                mimeType:
+                    message.documentMessage.mimetype || "",
+                fileName:
+                    message.documentMessage.fileName || "",
+                size:
+                    message.documentMessage.fileLength || 0
             },
             rawType
         };
@@ -179,10 +236,16 @@ function normalizeIncomingMessage(rawMessage) {
             media: {},
             rawType,
             location: {
-                latitude: message.locationMessage.degreesLatitude,
-                longitude: message.locationMessage.degreesLongitude,
-                name: message.locationMessage.name || "",
-                address: message.locationMessage.address || ""
+                latitude:
+                    message.locationMessage
+                        .degreesLatitude,
+                longitude:
+                    message.locationMessage
+                        .degreesLongitude,
+                name:
+                    message.locationMessage.name || "",
+                address:
+                    message.locationMessage.address || ""
             }
         };
     }
@@ -190,12 +253,17 @@ function normalizeIncomingMessage(rawMessage) {
     if (message.contactMessage) {
         return {
             type: "contact",
-            text: message.contactMessage.displayName || "",
+            text:
+                message.contactMessage
+                    .displayName || "",
             media: {},
             rawType,
             contact: {
-                displayName: message.contactMessage.displayName || "",
-                vcard: message.contactMessage.vcard || ""
+                displayName:
+                    message.contactMessage
+                        .displayName || "",
+                vcard:
+                    message.contactMessage.vcard || ""
             }
         };
     }
@@ -216,5 +284,6 @@ function extractPhone(remoteJid) {
 }
 
 function isGroupMessage(remoteJid) {
-    return String(remoteJid || "").includes("@g.us");
+    return String(remoteJid || "")
+        .includes("@g.us");
 }

@@ -1,6 +1,12 @@
 import { AppError } from "../../../core/errors/AppError.js";
 
-import { companyRepository } from "../../company/repositories/company.repository.js";
+import {
+    companyPostgresRepository
+} from "../../../database/repositories/company.postgres.repository.js";
+
+import {
+    whatsappInstancePostgresRepository
+} from "../../../database/repositories/whatsapp-instance.postgres.repository.js";
 
 import {
     setInstanceCompanyBinding,
@@ -10,7 +16,10 @@ import {
 
 const instanceCompanyBindings = new Map();
 
-export function bindInstanceToCompany(instanceId, companyId) {
+export async function bindInstanceToCompany(
+    instanceId,
+    companyId
+) {
     if (!instanceId) {
         throw new AppError("Informe instanceId.", 400);
     }
@@ -19,15 +28,47 @@ export function bindInstanceToCompany(instanceId, companyId) {
         throw new AppError("Informe companyId.", 400);
     }
 
-    const company = companyRepository.findById(companyId);
+    const company =
+        await companyPostgresRepository.findCompanyById(
+            companyId
+        );
 
     if (!company) {
-        throw new AppError("Empresa não encontrada.", 404);
+        throw new AppError(
+            "Empresa não encontrada.",
+            404
+        );
     }
 
-    instanceCompanyBindings.set(instanceId, companyId);
+    instanceCompanyBindings.set(
+        instanceId,
+        companyId
+    );
 
-    setInstanceCompanyBinding(instanceId, companyId);
+    setInstanceCompanyBinding(
+        instanceId,
+        companyId
+    );
+
+    const existingInstance =
+        await whatsappInstancePostgresRepository.findInstanceByKey(
+            companyId,
+            instanceId
+        );
+
+    if (!existingInstance) {
+        await whatsappInstancePostgresRepository.createInstance({
+            companyId,
+            instanceKey: instanceId,
+            provider: "baileys",
+            status: "idle",
+            sessionStatus: "disconnected",
+            metadata: {
+                boundAt: new Date().toISOString(),
+                bindingSource: "instance-company-resolver"
+            }
+        });
+    }
 
     return {
         instanceId,
@@ -37,7 +78,8 @@ export function bindInstanceToCompany(instanceId, companyId) {
 }
 
 export function getInstanceCompanyBinding(instanceId) {
-    const memoryCompanyId = instanceCompanyBindings.get(instanceId);
+    const memoryCompanyId =
+        instanceCompanyBindings.get(instanceId);
 
     if (memoryCompanyId) {
         return {
@@ -46,16 +88,25 @@ export function getInstanceCompanyBinding(instanceId) {
         };
     }
 
-    const storedCompanyId = getInstanceCompanyBindingFromStore(instanceId);
+    const storedCompanyId =
+        getInstanceCompanyBindingFromStore(instanceId);
+
+    if (storedCompanyId) {
+        instanceCompanyBindings.set(
+            instanceId,
+            storedCompanyId
+        );
+    }
 
     return {
         instanceId,
-        companyId: storedCompanyId
+        companyId: storedCompanyId || null
     };
 }
 
 export function listInstanceCompanyBindings() {
-    const storedBindings = listInstanceCompanyBindingsFromStore();
+    const storedBindings =
+        listInstanceCompanyBindingsFromStore();
 
     for (const binding of storedBindings) {
         instanceCompanyBindings.set(
@@ -69,24 +120,71 @@ export function listInstanceCompanyBindings() {
 
 export function resolveCompanyIdFromInstance(instanceId) {
     const boundCompanyId =
-        instanceCompanyBindings.get(instanceId) ||
-        getInstanceCompanyBindingFromStore(instanceId);
+        instanceCompanyBindings.get(instanceId)
+        || getInstanceCompanyBindingFromStore(instanceId);
 
-    if (boundCompanyId) {
-        return boundCompanyId;
+    return boundCompanyId || null;
+}
+
+export async function resolveCompanyIdFromInstancePersistent(
+    instanceId
+) {
+    if (!instanceId) {
+        throw new AppError(
+            "Informe instanceId.",
+            400
+        );
     }
 
-    const company = companyRepository.findById(instanceId);
+    const localCompanyId =
+        resolveCompanyIdFromInstance(instanceId);
 
-    if (company) {
-        return company.id;
+    if (localCompanyId) {
+        return localCompanyId;
     }
 
-    const companies = companyRepository.list();
+    const persistedInstance =
+        await whatsappInstancePostgresRepository
+            .findInstanceByKeyGlobal(instanceId);
+
+    if (persistedInstance?.companyId) {
+        cacheBinding(
+            instanceId,
+            persistedInstance.companyId
+        );
+
+        return persistedInstance.companyId;
+    }
+
+    const companies =
+        await companyPostgresRepository.listCompanies({
+            limit: 2,
+            offset: 0
+        });
 
     if (companies.length === 1) {
+        cacheBinding(
+            instanceId,
+            companies[0].id
+        );
+
         return companies[0].id;
     }
 
-    return instanceId;
+    throw new AppError(
+        `Não foi possível resolver a empresa da instância "${instanceId}".`,
+        404
+    );
+}
+
+function cacheBinding(instanceId, companyId) {
+    instanceCompanyBindings.set(
+        instanceId,
+        companyId
+    );
+
+    setInstanceCompanyBinding(
+        instanceId,
+        companyId
+    );
 }

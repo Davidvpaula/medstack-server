@@ -53,11 +53,48 @@ class WhatsappInstancePostgresRepository extends BaseCompanyRepository {
             [companyId, instanceKey]
         );
 
-        return rows[0] ? objectToCamelCase(rows[0]) : null;
+        return rows[0]
+            ? objectToCamelCase(rows[0])
+            : null;
+    }
+
+    async findInstanceByKeyGlobal(instanceKey) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM whatsapp_instances
+            WHERE instance_key = $1
+            AND deleted_at IS NULL
+            ORDER BY created_at ASC
+            LIMIT 2
+            `,
+            [instanceKey]
+        );
+
+        if (rows.length !== 1) {
+            return null;
+        }
+
+        return objectToCamelCase(rows[0]);
     }
 
     async listInstancesByCompany(companyId, options = {}) {
-        const rows = await this.findAllByCompany(companyId, options);
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM whatsapp_instances
+            WHERE company_id = $1
+            AND deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT $2
+            OFFSET $3
+            `,
+            [
+                companyId,
+                options.limit || 100,
+                options.offset || 0
+            ]
+        );
 
         return rowsToCamelCase(rows);
     }
@@ -78,12 +115,23 @@ class WhatsappInstancePostgresRepository extends BaseCompanyRepository {
             })
         );
 
-        const row = await this.updateByCompany(id, companyId, payload);
+        const row = await this.updateByCompany(
+            id,
+            companyId,
+            payload
+        );
 
-        return row ? objectToCamelCase(row) : null;
+        return row
+            ? objectToCamelCase(row)
+            : null;
     }
 
     async markConnected(companyId, id, data = {}) {
+        const current = await this.findInstanceById(
+            companyId,
+            id
+        );
+
         return this.updateInstance(companyId, id, {
             status: "connected",
             sessionStatus: "connected",
@@ -91,23 +139,40 @@ class WhatsappInstancePostgresRepository extends BaseCompanyRepository {
             lastError: null,
             phone: data.phone,
             displayName: data.displayName,
-            metadata: data.metadata
+            metadata: {
+                ...(current?.metadata || {}),
+                ...(data.metadata || {})
+            }
         });
     }
 
     async markDisconnected(companyId, id, error = null) {
+        const current = await this.findInstanceById(
+            companyId,
+            id
+        );
+
         return this.updateInstance(companyId, id, {
             status: "disconnected",
             sessionStatus: "disconnected",
             lastDisconnectedAt: new Date().toISOString(),
-            lastError: error
+            lastError: error,
+            metadata: {
+                ...(current?.metadata || {}),
+                lastDisconnectError: error
+            }
         });
     }
 
     async softDeleteInstance(companyId, id) {
-        const row = await this.softDeleteByCompany(id, companyId);
+        const row = await this.softDeleteByCompany(
+            id,
+            companyId
+        );
 
-        return row ? objectToCamelCase(row) : null;
+        return row
+            ? objectToCamelCase(row)
+            : null;
     }
 }
 

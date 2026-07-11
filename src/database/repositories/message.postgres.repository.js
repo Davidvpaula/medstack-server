@@ -22,7 +22,7 @@ class MessagePostgresRepository extends BaseCompanyRepository {
                 externalId: data.externalId || null,
                 direction: data.direction,
                 type: data.type || "text",
-                content: data.content || null,
+                content: data.content || data.text || null,
                 status: data.status || "created",
                 provider: data.provider || "baileys",
                 metadata: data.metadata || {},
@@ -38,10 +38,103 @@ class MessagePostgresRepository extends BaseCompanyRepository {
         return objectToCamelCase(row);
     }
 
-    async findMessageById(companyId, id) {
-        const row = await this.findByIdAndCompany(id, companyId);
+    async listMessages(options = {}) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM messages
+            WHERE deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT $1
+            OFFSET $2
+            `,
+            [
+                options.limit || 100,
+                options.offset || 0
+            ]
+        );
 
-        return row ? objectToCamelCase(row) : null;
+        return rowsToCamelCase(rows);
+    }
+
+    async listMessagesByCompany(companyId, options = {}) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM messages
+            WHERE company_id = $1
+            AND deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT $2
+            OFFSET $3
+            `,
+            [
+                companyId,
+                options.limit || 100,
+                options.offset || 0
+            ]
+        );
+
+        return rowsToCamelCase(rows);
+    }
+
+    async listMessagesByConversation(companyId, conversationId, options = {}) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM messages
+            WHERE company_id = $1
+            AND conversation_id = $2
+            AND deleted_at IS NULL
+            ORDER BY created_at ASC
+            LIMIT $3
+            OFFSET $4
+            `,
+            [
+                companyId,
+                conversationId,
+                options.limit || 100,
+                options.offset || 0
+            ]
+        );
+
+        return rowsToCamelCase(rows);
+    }
+
+    async listMessagesByContact(contactId, options = {}) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM messages
+            WHERE contact_id = $1
+            AND deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT $2
+            OFFSET $3
+            `,
+            [
+                contactId,
+                options.limit || 100,
+                options.offset || 0
+            ]
+        );
+
+        return rowsToCamelCase(rows);
+    }
+
+    async findMessageById(id) {
+        const rows = await this.raw(
+            `
+            SELECT *
+            FROM messages
+            WHERE id = $1
+            AND deleted_at IS NULL
+            LIMIT 1
+            `,
+            [id]
+        );
+
+        return rows[0] ? objectToCamelCase(rows[0]) : null;
     }
 
     async findMessageByExternalId(companyId, externalId) {
@@ -60,36 +153,13 @@ class MessagePostgresRepository extends BaseCompanyRepository {
         return rows[0] ? objectToCamelCase(rows[0]) : null;
     }
 
-    async listMessagesByConversation(companyId, conversationId, options = {}) {
-        const {
-            limit = 100,
-            offset = 0
-        } = options;
-
-        const rows = await this.raw(
-            `
-            SELECT *
-            FROM messages
-            WHERE company_id = $1
-            AND conversation_id = $2
-            AND deleted_at IS NULL
-            ORDER BY created_at ASC
-            LIMIT $3
-            OFFSET $4
-            `,
-            [companyId, conversationId, limit, offset]
-        );
-
-        return rowsToCamelCase(rows);
-    }
-
-    async updateMessage(companyId, id, data = {}) {
+    async updateMessage(id, data = {}) {
         const payload = objectToSnakeCase(
             removeUndefined({
                 externalId: data.externalId,
                 direction: data.direction,
                 type: data.type,
-                content: data.content,
+                content: data.content || data.text,
                 status: data.status,
                 provider: data.provider,
                 metadata: data.metadata,
@@ -100,44 +170,47 @@ class MessagePostgresRepository extends BaseCompanyRepository {
             })
         );
 
-        const row = await this.updateByCompany(id, companyId, payload);
+        const row = await this.update(id, payload);
 
         return row ? objectToCamelCase(row) : null;
     }
 
-    async markSent(companyId, id) {
-        return this.updateMessage(companyId, id, {
+    async markSent(id) {
+        return this.updateMessage(id, {
             status: "sent",
             sentAt: new Date().toISOString()
         });
     }
 
-    async markDelivered(companyId, id) {
-        return this.updateMessage(companyId, id, {
+    async markDelivered(id) {
+        return this.updateMessage(id, {
             status: "delivered",
             deliveredAt: new Date().toISOString()
         });
     }
 
-    async markRead(companyId, id) {
-        return this.updateMessage(companyId, id, {
+    async markRead(id) {
+        return this.updateMessage(id, {
             status: "read",
             readAt: new Date().toISOString()
         });
     }
 
-    async markFailed(companyId, id, error = null) {
-        return this.updateMessage(companyId, id, {
+    async markFailed(id, error = null) {
+        const message = await this.findMessageById(id);
+
+        return this.updateMessage(id, {
             status: "failed",
             failedAt: new Date().toISOString(),
             metadata: {
+                ...(message?.metadata || {}),
                 error
             }
         });
     }
 
-    async softDeleteMessage(companyId, id) {
-        const row = await this.softDeleteByCompany(id, companyId);
+    async softDeleteMessage(id) {
+        const row = await this.softDelete(id);
 
         return row ? objectToCamelCase(row) : null;
     }
